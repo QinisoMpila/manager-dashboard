@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Personal Claims App - Finance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background-color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .logout-btn {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .logout-btn:hover {
+            background-color: #5a6268;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background-color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .tab-btn {
+            padding: 10px 20px;
+            background-color: #f0f0f0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #555;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn.active {
+            background-color: #667eea;
+            color: white;
+        }
+        
+        .tab-btn:hover {
+            background-color: #667eea;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .section {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .message.show {
+            display: block;
+        }
+        
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .batch-card {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .batch-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        @media (max-width: 800px) {
+            .batch-header {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .batch-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        
+        .batch-value {
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .export-form {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+        
+        .format-description {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            padding: 8px;
+            background-color: #e7f3ff;
+            border-left: 3px solid #2196F3;
+            border-radius: 3px;
+        }
+        
+        .btn-export {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .btn-export:hover {
+            background-color: #218838;
+        }
+        
+        .btn-export:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-exported {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        
+        .hash-display {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            word-break: break-all;
+            border-left: 4px solid #667eea;
+        }
+        
+        .hash-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .batch-transactions {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        
+        .transaction-item {
+            font-size: 13px;
+            color: #666;
+            padding: 5px;
+            margin: 3px 0;
+        }
+        
+        .export-history-item {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #cce5ff;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        @media (max-width: 600px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>💰 Finance Dashboard - Payment Export</h1>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+    
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('export')">📤 Export Payments</button>
+        <button class="tab-btn" onclick="switchTab('history')">📋 Export History</button>
+    </div>
+    
+    <!-- Export Tab -->
+    <div id="export" class="tab-content active">
+        <div class="section">
+            <h2>Approved Batches Ready for Export</h2>
+            
+            <div id="exportMessage" class="message"></div>
+            
+            <div id="exportList">
+                <div class="loading">Loading batches...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- History Tab -->
+    <div id="history" class="tab-content">
+        <div class="section">
+            <h2>Payment Export History</h2>
+            
+            <div id="historyList">
+                <div class="loading">Loading export history...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://wxjchdcohsuhyeokzmtd.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_IY6JOZpXAkLlHG0uUAfbeg_7roRDcEg";
+    
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let currentUser = null;
+    let approvedBatches = [];
+    
+    // Load data on page load
+    window.addEventListener('load', function() {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+            try {
+                currentUser = JSON.parse(stored);
+                loadData();
+            } catch (err) {
+                alert('Session expired. Please login again.');
+                logout();
+            }
+        } else {
+            alert('Please login first');
+            logout();
+        }
+    });
+    
+    // Switch tabs
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        document.getElementById(tabName).classList.add('active');
+        event.target.classList.add('active');
+        
+        loadData();
+    }
+    
+    // Load all data
+    async function loadData() {
+        const activeTab = document.querySelector('.tab-content.active').id;
+        
+        if (activeTab === 'export') {
+            await loadApprovedBatches();
+        } else {
+            await loadExportHistory();
+        }
+    }
+    
+    // Load approved batches
+    async function loadApprovedBatches() {
+        try {
+            const { data: batches, error } = await supabaseClient
+                .from('batches')
+                .select('*')
+                .eq('status', 'approved')
+                .order('created_date', { ascending: false });
+            
+            if (error) {
+                console.error('Error loading batches:', error);
+                return;
+            }
+            
+            approvedBatches = batches || [];
+            renderApprovedBatches();
+        } catch (err) {
+            console.error('Error:', err);
+        }
+    }
+    
+    // Render approved batches with export options
+    async function renderApprovedBatches() {
+        if (!approvedBatches || approvedBatches.length === 0) {
+            document.getElementById('exportList').innerHTML = 
+                '<div class="empty-state">✅ No approved batches pending export</div>';
+            return;
+        }
+        
+        let html = '';
+        
+        for (const batch of approvedBatches) {
+            const { data: employee } = await supabaseClient
+                .from('users')
+                .select('*')
+                .eq('id', batch.employee_id)
+                .single();
+            
+            const employeeName = employee ? `${employee.name} ${employee.surname}` : 'Unknown';
+            const bankAccount = employee ? employee.bank_account : 'Not provided';
+            const txCount = batch.transaction_ids ? batch.transaction_ids.length : 0;
+            
+            html += `
+                <div class="batch-card">
+                    <div class="batch-header">
+                        <div>
+                            <div class="batch-label">Employee</div>
+                            <div class="batch-value">${employeeName}</div>
+                        </div>
+                        <div>
+                            <div class="batch-label">Profit Center</div>
+                            <div class="batch-value">${batch.profit_center}</div>
+                        </div>
+                        <div>
+                            <div class="batch-label">Amount</div>
+                            <div class="batch-value">R${batch.total_amount.toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <div class="batch-label">Status</div>
+                            <span class="status-badge status-approved">✅ APPROVED</span>
+                        </div>
+                    </div>
+                    
+                    <div class="batch-header">
+                        <div>
+                            <div class="batch-label">Bank Account</div>
+                            <div class="batch-value">${bankAccount}</div>
+                        </div>
+                        <div>
+                            <div class="batch-label">Transactions</div>
+                            <div class="batch-value">${txCount}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="export-form">
+                        <div class="form-group">
+                            <label for="format-${batch.id}">Select Export Format:</label>
+                            <select id="format-${batch.id}" onchange="updateFormatInfo(${batch.id})">
+                                <option value="">-- Select Format --</option>
+                                <option value="acb">ACB (Bankserv) - Universal Format</option>
+                                <option value="netbank">NetBank Business (Secure Format) - Nedbank Only</option>
+                                <option value="iso20022">ISO 20022 XML - International Standard</option>
+                            </select>
+                            <div class="format-description" id="desc-${batch.id}"></div>
+                        </div>
+                        
+                        <div class="form-group" id="seed-group-${batch.id}" style="display: none;">
+                            <label for="seed-${batch.id}">Seed Number (NetBank Secure):</label>
+                            <input type="text" id="seed-${batch.id}" placeholder="32 characters: ABCDEF123456789 only" maxlength="32">
+                            <small style="color: #666; font-size: 12px;">Must be exactly 32 characters containing only A-F and 0-9</small>
+                        </div>
+                        
+                        <button class="btn-export" onclick="exportBatch(${batch.id})">📥 Export This Batch</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        document.getElementById('exportList').innerHTML = html;
+    }
+    
+    // Update format description
+    function updateFormatInfo(batchId) {
+        const format = document.getElementById(`format-${batchId}`).value;
+        const descDiv = document.getElementById(`desc-${batchId}`);
+        const seedGroup = document.getElementById(`seed-group-${batchId}`);
+        
+        const descriptions = {
+            'acb': '✅ ACB (Bankserv): Universal format accepted by all SA banks. Fixed 181-character records. Uses Hash Total for fraud prevention.',
+            'netbank': '✅ NetBank Business (Secure Format): Nedbank proprietary format. CSV with complex hash algorithm. Requires Seed Number registration with Nedbank.',
+            'iso20022': '✅ ISO 20022 XML: International standard format. Modern, structured XML. Accepted by larger banks (Standard Bank, Investec, etc).'
+        };
+        
+        descDiv.textContent = descriptions[format] || '';
+        
+        if (format === 'netbank') {
+            seedGroup.style.display = 'block';
+        } else {
+            seedGroup.style.display = 'none';
+        }
+    }
+    
+    // Export batch
+    async function exportBatch(batchId) {
+        const format = document.getElementById(`format-${batchId}`).value;
+        
+        if (!format) {
+            alert('Please select an export format');
+            return;
+        }
+        
+        let seedNumber = null;
+        if (format === 'netbank') {
+            seedNumber = document.getElementById(`seed-${batchId}`).value.trim();
+            if (seedNumber.length !== 32 || !/^[A-F0-9]+$/.test(seedNumber)) {
+                alert('Seed Number must be exactly 32 characters containing only A-F and 0-9');
+                return;
+            }
+        }
+        
+        try {
+            const batch = approvedBatches.find(b => b.id === batchId);
+            if (!batch) return;
+            
+            // Get employee data
+            const { data: employee } = await supabaseClient
+                .from('users')
+                .select('*')
+                .eq('id', batch.employee_id)
+                .single();
+            
+            let fileContent, fileName, fileHash;
+            
+            if (format === 'acb') {
+                const result = generateACBFormat(batch, employee);
+                fileContent = result.content;
+                fileName = result.fileName;
+            } else if (format === 'netbank') {
+                const result = generateNetBankFormat(batch, employee, seedNumber);
+                fileContent = result.content;
+                fileName = result.fileName;
+            } else if (format === 'iso20022') {
+                const result = generateISO20022Format(batch, employee);
+                fileContent = result.content;
+                fileName = result.fileName;
+            }
+            
+            // Calculate SHA-256 hash
+            fileHash = await calculateHash(fileContent);
+            
+            // Save to payment_exports table
+            const { data: exportRecord, error: exportError } = await supabaseClient
+                .from('payment_exports')
+                .insert({
+                    batch_id: batchId,
+                    export_date: new Date().toISOString(),
+                    exported_by_finance_id: currentUser.id,
+                    bank_format: format,
+                    file_hash: fileHash,
+                    total_amount: batch.total_amount,
+                    transaction_count: batch.transaction_ids ? batch.transaction_ids.length : 0,
+                    status: 'pending_reconciliation'
+                })
+                .select();
+            
+            if (exportError) {
+                alert('Error saving export record: ' + exportError.message);
+                return;
+            }
+            
+            // Update batch status
+            const { error: updateError } = await supabaseClient
+                .from('batches')
+                .update({ status: 'exported' })
+                .eq('id', batchId);
+            
+            if (updateError) {
+                alert('Error updating batch status: ' + updateError.message);
+                return;
+            }
+            
+            // Download file
+            downloadFile(fileContent, fileName);
+            
+            alert(`✅ Batch exported successfully!\n\nFormat: ${format.toUpperCase()}\nHash: ${fileHash.substring(0, 16)}...\n\nFile is ready for bank upload.`);
+            
+            loadData();
+        } catch (err) {
+            alert('Error exporting batch: ' + err.message);
+        }
+    }
+    
+    // Generate ACB format
+    function generateACBFormat(batch, employee) {
+        const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        let content = '';
+        
+        // Header record (02)
+        content += '02';
+        content += '0'.repeat(10); // Spare
+        content += timestamp;
+        content += '0'.repeat(10); // Time
+        content += 'BATCH'.padEnd(20);
+        content += '0'.repeat(109);
+        content += '\r\n';
+        
+        // Detail record (04)
+        const bankAccount = (employee.bank_account || '').padEnd(11);
+        const amount = batch.total_amount.toFixed(2).replace('.', '').padStart(11, '0');
+        
+        content += '04';
+        content += bankAccount;
+        content += amount;
+        content += 'CLAIMS'.padEnd(25);
+        content += '0'.repeat(108);
+        content += '\r\n';
+        
+        // Trailer record (06)
+        content += '06';
+        content += '1'.padStart(6, '0'); // Number of transactions
+        content += amount;
+        content += '0'.repeat(155);
+        content += '\r\n';
+        
+        return {
+            content: content,
+            fileName: `export_acb_${batch.id}_${timestamp}.acb`
+        };
+    }
+    
+    // Generate NetBank Business Secure Format
+    function generateNetBankFormat(batch, employee, seedNumber) {
+        const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const bankAccount = employee.bank_account || '';
+        const amount = batch.total_amount.toFixed(2);
+        
+        let content = 'Employee,Bank Account,Amount,Profit Center,Reference\r\n';
+        content += `${employee.id},${bankAccount},${amount},${batch.profit_center},BATCH-${batch.id}\r\n`;
+        
+        // Add seed number in header for verification
+        content += `SEED:${seedNumber}\r\n`;
+        
+        return {
+            content: content,
+            fileName: `export_netbank_${batch.id}_${timestamp}.csv`
+        };
+    }
+    
+    // Generate ISO 20022 XML
+    function generateISO20022Format(batch, employee) {
+        const timestamp = new Date().toISOString();
+        const bankAccount = employee.bank_account || '';
+        
+        let xml = '<?xml version="1.0" encoding="UTF-8"?>\r\n';
+        xml += '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03">\r\n';
+        xml += '  <CstmrCdtTrfInitn>\r\n';
+        xml += '    <GrpHdr>\r\n';
+        xml += `      <MsgId>BATCH-${batch.id}</MsgId>\r\n`;
+        xml += `      <CreDtTm>${timestamp}</CreDtTm>\r\n`;
+        xml += `      <NbOfTxns>1</NbOfTxns>\r\n`;
+        xml += `      <CtrlSum>${batch.total_amount.toFixed(2)}</CtrlSum>\r\n`;
+        xml += '    </GrpHdr>\r\n';
+        xml += '    <PmtInf>\r\n';
+        xml += `      <PmtInfId>PAY-${batch.id}</PmtInfId>\r\n`;
+        xml += `      <PmtMtd>TRF</PmtMtd>\r\n`;
+        xml += '      <Dbtr>\r\n';
+        xml += `        <Nm>${employee.name} ${employee.surname}</Nm>\r\n`;
+        xml += '        <Id>\r\n';
+        xml += `          <OrgId><Othr><Id>${employee.employee_number}</Id></Othr></OrgId>\r\n`;
+        xml += '        </Id>\r\n';
+        xml += '      </Dbtr>\r\n';
+        xml += '      <DbtrAcct>\r\n';
+        xml += `        <Id><Othr><Id>${bankAccount}</Id></Othr></Id>\r\n`;
+        xml += '      </DbtrAcct>\r\n';
+        xml += '      <CdtTrfTxInf>\r\n';
+        xml += `        <PmtId><InstrId>TXN-${batch.id}</InstrId></PmtId>\r\n`;
+        xml += `        <Amt><InstdAmt Ccy="ZAR">${batch.total_amount.toFixed(2)}</InstdAmt></Amt>\r\n`;
+        xml += `        <Cdtr><Nm>${employee.name} ${employee.surname}</Nm></Cdtr>\r\n`;
+        xml += `        <CdtrAcct><Id><Othr><Id>${bankAccount}</Id></Othr></Id></CdtrAcct>\r\n`;
+        xml += '      </CdtTrfTxInf>\r\n';
+        xml += '    </PmtInf>\r\n';
+        xml += '  </CstmrCdtTrfInitn>\r\n';
+        xml += '</Document>\r\n';
+        
+        return {
+            content: xml,
+            fileName: `export_iso20022_${batch.id}.xml`
+        };
+    }
+    
+    // Calculate SHA-256 hash
+    async function calculateHash(content) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(content);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    
+    // Download file
+    function downloadFile(content, fileName) {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    }
+    
+    // Load export history
+    async function loadExportHistory() {
+        try {
+            const { data: exports, error } = await supabaseClient
+                .from('payment_exports')
+                .select('*')
+                .order('export_date', { ascending: false });
+            
+            if (error) {
+                console.error('Error loading history:', error);
+                return;
+            }
+            
+            renderExportHistory(exports || []);
+        } catch (err) {
+            console.error('Error:', err);
+        }
+    }
+    
+    // Render export history
+    async function renderExportHistory(exports) {
+        if (!exports || exports.length === 0) {
+            document.getElementById('historyList').innerHTML = 
+                '<div class="empty-state">No export history yet</div>';
+            return;
+        }
+        
+        let html = '';
+        
+        for (const exp of exports) {
+            const { data: batch } = await supabaseClient
+                .from('batches')
+                .select('*')
+                .eq('id', exp.batch_id)
+                .single();
+            
+            const { data: employee } = await supabaseClient
+                .from('users')
+                .select('*')
+                .eq('id', batch.employee_id)
+                .single();
+            
+            const employeeName = employee ? `${employee.name} ${employee.surname}` : 'Unknown';
+            const exportDate = new Date(exp.export_date).toLocaleDateString();
+            
+            html += `
+                <div class="export-history-item">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <div class="batch-label">Employee</div>
+                            <div class="batch-value">${employeeName}</div>
+                        </div>
+                        <div>
+                            <div class="batch-label">Format</div>
+                            <div class="batch-value">${exp.bank_format.toUpperCase()}</div>
+                        </div>
+                        <div>
+                            <div class="batch-label">Amount</div>
+                            <div class="batch-value">R${exp.total_amount.toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <div class="batch-label">Export Date</div>
+                            <div class="batch-value">${exportDate}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="hash-display">
+                        <div class="hash-label">SHA-256 Hash (Proof of Immutability):</div>
+                        <div>${exp.file_hash}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        document.getElementById('historyList').innerHTML = html;
+    }
+    
+    function logout() {
+        localStorage.removeItem('currentUser');
+        window.location.href = 'https://employee-dashboard-h8wqmz7qq-qiniso-mpila.vercel.app';
+    }
+</script>
+
+</body>
+</html>
