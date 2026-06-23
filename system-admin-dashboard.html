@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Admin Dashboard - ClaimFlow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .user-details h3 {
+            font-size: 14px;
+            color: #e0e0e0;
+        }
+
+        .user-details p {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-detail {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: #00d4ff;
+            border-bottom-color: #00d4ff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 13px;
+        }
+
+        tr:hover {
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border-left: 3px solid rgba(0, 212, 255, 0.3);
+        }
+
+        .setting-info h3 {
+            font-size: 13px;
+            color: #e0e0e0;
+            margin-bottom: 5px;
+        }
+
+        .setting-info p {
+            font-size: 11px;
+            color: #888;
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .role-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .role-card h3 {
+            color: #00d4ff;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .permission {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .permission input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 8px 16px;
+            font-size: 11px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+            color: white;
+        }
+
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            background: rgba(0, 212, 255, 0.1);
+            border-color: #00d4ff;
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(158, 158, 158, 0.3);
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4caf50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .log-entry {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 3px solid rgba(0, 212, 255, 0.3);
+            font-size: 12px;
+        }
+
+        .log-time {
+            color: #888;
+            font-size: 11px;
+        }
+
+        .log-action {
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .log-user {
+            color: #4caf50;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+
+        .badge-success {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .badge-warning {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .badge-error {
+            background: rgba(255, 87, 34, 0.2);
+            color: #ff5722;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+            padding: 15px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 12px;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ System Admin Dashboard</h1>
+            <div class="user-info">
+                <div class="avatar">RC</div>
+                <div class="user-details">
+                    <h3>Robert Chen</h3>
+                    <p>System Administrator</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">System Status</div>
+                <div class="stat-value" style="color: #4caf50;">● Online</div>
+                <div class="stat-detail">All systems operational</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Users</div>
+                <div class="stat-value">47</div>
+                <div class="stat-detail">Currently logged in</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Database Size</div>
+                <div class="stat-value">1.2 GB</div>
+                <div class="stat-detail">84% capacity used</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Last Backup</div>
+                <div class="stat-value">2 hrs ago</div>
+                <div class="stat-detail">Automated daily</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">System Configuration & Management</div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="settings">Settings</button>
+                <button class="tab-btn" data-tab="roles">Roles & Permissions</button>
+                <button class="tab-btn" data-tab="data-management">Data Management</button>
+                <button class="tab-btn" data-tab="system-logs">System Logs</button>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content active">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>System Maintenance Mode</h3>
+                        <p>Enable to restrict access during maintenance</p>
+                    </div>
+                    <div class="toggle-switch">
+                        <label class="switch">
+                            <input type="checkbox">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Two-Factor Authentication</h3>
+                        <p>Require 2FA for admin accounts</p>
+                    </div>
+                    <div class="toggle-switch">
+                        <label class="switch">
+                            <input type="checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Email Notifications</h3>
+                        <p>Send system alerts to admin email</p>
+                    </div>
+                    <div class="toggle-switch">
+                        <label class="switch">
+                            <input type="checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Session Timeout (minutes)</h3>
+                        <p>Auto logout after inactivity</p>
+                    </div>
+                    <input type="number" value="30" style="width: 100px;">
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Claim Approval Threshold</h3>
+                        <p>Amount requiring manager approval (ZAR)</p>
+                    </div>
+                    <input type="number" value="5000" style="width: 150px;">
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button class="btn-primary" onclick="saveSettings()">Save Configuration</button>
+                </div>
+            </div>
+
+            <!-- Roles & Permissions Tab -->
+            <div id="roles" class="tab-content">
+                <div class="role-grid">
+                    <div class="role-card">
+                        <h3>👤 Employee</h3>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Submit claims</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>View own claims</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" disabled>
+                            <span>Approve claims</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" disabled>
+                            <span>Export data</span>
+                        </div>
+                    </div>
+
+                    <div class="role-card">
+                        <h3>👨‍💼 Manager</h3>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Submit claims</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>View team claims</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Approve claims</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" disabled>
+                            <span>Manage users</span>
+                        </div>
+                    </div>
+
+                    <div class="role-card">
+                        <h3>💰 Finance Manager</h3>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>View all claims</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Reconcile payments</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Export for payment</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Generate reports</span>
+                        </div>
+                    </div>
+
+                    <div class="role-card">
+                        <h3>👥 HR Admin</h3>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Manage users</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Approve banking changes</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>View user activity</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" disabled>
+                            <span>System configuration</span>
+                        </div>
+                    </div>
+
+                    <div class="role-card">
+                        <h3>⚙️ System Admin</h3>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>All permissions</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>System configuration</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>Data management</span>
+                        </div>
+                        <div class="permission">
+                            <input type="checkbox" checked disabled>
+                            <span>View system logs</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Management Tab -->
+            <div id="data-management" class="tab-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h3 style="color: #00d4ff; margin-bottom: 15px;">📤 Data Export</h3>
+                        <button class="btn-export" onclick="exportData('claims')" style="width: 100%; margin-bottom: 10px;">Export All Claims</button>
+                        <button class="btn-export" onclick="exportData('users')" style="width: 100%; margin-bottom: 10px;">Export User Directory</button>
+                        <button class="btn-export" onclick="exportData('reconciliation')" style="width: 100%; margin-bottom: 10px;">Export Reconciliation Data</button>
+                        <button class="btn-export" onclick="exportData('audit')" style="width: 100%;">Export Audit Log</button>
+                    </div>
+                    <div>
+                        <h3 style="color: #00d4ff; margin-bottom: 15px;">📥 Data Import</h3>
+                        <div style="border: 2px dashed rgba(0, 212, 255, 0.3); border-radius: 8px; padding: 30px; text-align: center;">
+                            <input type="file" id="importFile" accept=".csv,.xlsx" style="display: none;">
+                            <button class="btn-secondary" onclick="document.getElementById('importFile').click()" style="width: 100%;">Select File to Import</button>
+                            <p style="margin-top: 15px; font-size: 11px; color: #888;">CSV or XLSX format</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; border-radius: 6px;">
+                    <p style="font-size: 12px; color: #ffc107;">⚠️ Data imports will overwrite existing records. Always backup before importing.</p>
+                </div>
+            </div>
+
+            <!-- System Logs Tab -->
+            <div id="system-logs" class="tab-content">
+                <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                    <input type="text" placeholder="Filter by action or user..." style="flex: 1;">
+                    <button class="btn-secondary">Filter</button>
+                    <button class="btn-secondary" onclick="clearLogs()">Clear Logs</button>
+                </div>
+                <div id="logsList">
+                    <div class="log-entry">
+                        <div class="log-time">2026-06-22 14:32:15</div>
+                        <span class="log-action">Claim Submitted</span>
+                        <span class="log-user">CLM-2026-0891 by Sipho Ndlovu</span>
+                        <span class="badge badge-success">Success</span>
+                    </div>
+                    <div class="log-entry">
+                        <div class="log-time">2026-06-22 14:18:42</div>
+                        <span class="log-action">Banking Change Approved</span>
+                        <span class="log-user">Amara Osei by Lerato Thabo</span>
+                        <span class="badge badge-success">Success</span>
+                    </div>
+                    <div class="log-entry">
+                        <div class="log-time">2026-06-22 14:05:28</div>
+                        <span class="log-action">User Login</span>
+                        <span class="log-user">Thembi Nkosi</span>
+                        <span class="badge badge-success">Success</span>
+                    </div>
+                    <div class="log-entry">
+                        <div class="log-time">2026-06-22 13:52:19</div>
+                        <span class="log-action">Claim Approved</span>
+                        <span class="log-user">CLM-2026-0889 by Nomsa Zuma</span>
+                        <span class="badge badge-success">Success</span>
+                    </div>
+                    <div class="log-entry">
+                        <div class="log-time">2026-06-22 13:41:05</div>
+                        <span class="log-action">Data Export</span>
+                        <span class="log-user">All Claims by Thembi Nkosi</span>
+                        <span class="badge badge-success">Success</span>
+                    </div>
+                    <div class="log-entry">
+                        <div class="log-time">2026-06-22 13:25:33</div>
+                        <span class="log-action">Settings Changed</span>
+                        <span class="log-user">Session Timeout by Robert Chen</span>
+                        <span class="badge badge-success">Success</span>
+                    </div>
+                    <div class="log-entry">
+                        <div class="log-time">2026-06-22 13:10:47</div>
+                        <span class="log-action">Failed Login Attempt</span>
+                        <span class="log-user">Unknown user from 196.21.45.78</span>
+                        <span class="badge badge-warning">Warning</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>ClaimFlow v2.0 | System Admin Dashboard | Last updated: June 22, 2026</p>
+        </footer>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                });
+                
+                document.getElementById(tabName).classList.add('active');
+                this.classList.add('active');
+            });
+        });
+
+        function saveSettings() {
+            showToast('✓ System settings saved successfully');
+        }
+
+        function exportData(type) {
+            const types = {
+                'claims': 'All Claims (CSV)',
+                'users': 'User Directory (CSV)',
+                'reconciliation': 'Reconciliation Data (Excel)',
+                'audit': 'Audit Log (CSV)'
+            };
+            showToast(`✓ Exported: ${types[type]}`);
+        }
+
+        function clearLogs() {
+            if (confirm('Are you sure? This will permanently delete all system logs.')) {
+                document.getElementById('logsList').innerHTML = '<p style="color: #888; text-align: center;">No logs available</p>';
+                showToast('✓ System logs cleared');
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        document.getElementById('importFile').addEventListener('change', function() {
+            if (this.files.length > 0) {
+                showToast(`✓ Importing ${this.files[0].name}...`);
+                setTimeout(() => showToast('✓ Import completed successfully'), 1500);
+            }
+        });
+    </script>
+</body>
+</html>
