@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Dashboard - ClaimFlow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+
+        .global-nav {
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+            padding: 0;
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 999;
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .nav-brand {
+            font-size: 16px;
+            font-weight: 700;
+            color: #00d4ff;
+            padding: 12px 0;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 5px;
+            list-style: none;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            padding: 10px 15px;
+            color: #888;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+
+        .nav-link:hover {
+            color: #00d4ff;
+            border-bottom-color: #00d4ff;
+        }
+
+        .nav-link.active {
+            color: #00d4ff;
+            border-bottom-color: #00d4ff;
+        }
+
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .nav-user-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-user-name {
+            font-size: 12px;
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+
+        .nav-user-role {
+            font-size: 10px;
+            color: #888;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #00d4ff;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .stat-detail {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: #00d4ff;
+            border-bottom-color: #00d4ff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 13px;
+        }
+
+        tr:hover {
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .claim-id {
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .amount {
+            color: #4caf50;
+            font-weight: 600;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-approved {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .badge-batched {
+            background: rgba(0, 150, 136, 0.2);
+            color: #00968e;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            padding: 6px 12px;
+            font-size: 11px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 212, 255, 0.3);
+        }
+
+        .export-section {
+            background: rgba(0, 212, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .export-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .export-stat {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .export-stat label {
+            display: block;
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .export-stat value {
+            display: block;
+            font-size: 18px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+            padding: 15px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 12px;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="global-nav">
+        <div class="nav-container">
+            <a href="employee-dashboard-v2.html" class="nav-brand">💰 ClaimFlow v2.0</a>
+            <ul class="nav-links">
+                <li><a href="employee-dashboard-v2.html" class="nav-link">📝 Employee</a></li>
+                <li><a href="manager-dashboard-v2.html" class="nav-link">👨‍💼 Manager</a></li>
+                <li><a href="finance-dashboard-v2.html" class="nav-link active">💳 Finance</a></li>
+                <li><a href="reconciliation-dashboard-v2.html" class="nav-link">🔄 Reconciliation</a></li>
+                <li><a href="hr-admin-dashboard-v2.html" class="nav-link">👥 HR Admin</a></li>
+                <li><a href="system-admin-dashboard-v2.html" class="nav-link">⚙️ System</a></li>
+            </ul>
+            <div class="nav-user">
+                <div class="nav-avatar">TN</div>
+                <div class="nav-user-info">
+                    <div class="nav-user-name">Thembi Nkosi</div>
+                    <div class="nav-user-role">Finance Manager</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>💳 Finance Dashboard</h1>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Ready for Export</div>
+                <div class="stat-value" id="readyCount">0</div>
+                <div class="stat-detail">Approved claims</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Export Amount</div>
+                <div class="stat-value" id="readyAmount">R 0.00</div>
+                <div class="stat-detail">Ready for payment</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Batches Created</div>
+                <div class="stat-value" id="batchCount">0</div>
+                <div class="stat-detail">This month</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Exported This Month</div>
+                <div class="stat-value" id="exportedAmount">R 0.00</div>
+                <div class="stat-detail">Total batched</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">📤 Export Claims</div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="ready">Ready for Export</button>
+                <button class="tab-btn" data-tab="batched">Exported Batches</button>
+            </div>
+
+            <!-- Ready for Export Tab -->
+            <div id="ready" class="tab-content active">
+                <div class="export-section">
+                    <div class="export-info">
+                        <div class="export-stat">
+                            <label>Selected for Export</label>
+                            <value id="selectedCount">0</value>
+                        </div>
+                        <div class="export-stat">
+                            <label>Total Amount</label>
+                            <value id="selectedAmount">R 0.00</value>
+                        </div>
+                        <div class="export-stat">
+                            <label>Export Format</label>
+                            <value>ACB / NetBank</value>
+                        </div>
+                    </div>
+                    <button class="btn-export" onclick="exportToACB()">📥 Export as ACB File</button>
+                    <button class="btn-secondary" onclick="exportToNetBank()">🏦 Export as NetBank XML</button>
+                </div>
+
+                <table id="readyTable">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
+                            <th>Claim ID</th>
+                            <th>Employee</th>
+                            <th>Amount</th>
+                            <th>Bank Account</th>
+                            <th>Approved Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="readyBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #888; padding: 40px;">No approved claims waiting for export</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Batched Tab -->
+            <div id="batched" class="tab-content">
+                <table id="batchedTable">
+                    <thead>
+                        <tr>
+                            <th>Batch ID</th>
+                            <th>Claims</th>
+                            <th>Amount</th>
+                            <th>Format</th>
+                            <th>Exported Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="batchedBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #888; padding: 40px;">No batches exported yet</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer>
+            <p>ClaimFlow v2.0 | Finance Dashboard | Last updated: June 22, 2026</p>
+        </footer>
+    </div>
+
+    <script>
+        const ClaimFlow = {
+            getAllClaims() {
+                return JSON.parse(localStorage.getItem('claimflow_claims') || '[]');
+            },
+
+            updateClaim(claimId, updates) {
+                const claims = this.getAllClaims();
+                const claim = claims.find(c => c.id === claimId);
+                if (claim) {
+                    Object.assign(claim, updates);
+                    localStorage.setItem('claimflow_claims', JSON.stringify(claims));
+                }
+                return claim;
+            },
+
+            getBatches() {
+                return JSON.parse(localStorage.getItem('claimflow_batches') || '[]');
+            },
+
+            addBatch(batch) {
+                const batches = this.getBatches();
+                batches.unshift(batch);
+                localStorage.setItem('claimflow_batches', JSON.stringify(batches));
+                return batch;
+            }
+        };
+
+        let selectedClaims = [];
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.getElementById(tabName).classList.add('active');
+                this.classList.add('active');
+            });
+        });
+
+        function updateStats() {
+            const claims = ClaimFlow.getAllClaims();
+            const batches = ClaimFlow.getBatches();
+            const ready = claims.filter(c => c.status === 'Approved');
+            const batched = claims.filter(c => c.status === 'Batched');
+
+            const readyAmount = ready.reduce((sum, c) => sum + c.amount, 0);
+            const batchedAmount = batched.reduce((sum, c) => sum + c.amount, 0);
+
+            document.getElementById('readyCount').textContent = ready.length;
+            document.getElementById('readyAmount').textContent = 'R ' + readyAmount.toFixed(2);
+            document.getElementById('batchCount').textContent = batches.length;
+            document.getElementById('exportedAmount').textContent = 'R ' + batchedAmount.toFixed(2);
+        }
+
+        function renderClaims() {
+            const claims = ClaimFlow.getAllClaims();
+            const ready = claims.filter(c => c.status === 'Approved');
+            const batches = ClaimFlow.getBatches();
+
+            const readyBody = document.getElementById('readyBody');
+            if (ready.length === 0) {
+                readyBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #888; padding: 40px;">No approved claims waiting for export</td></tr>';
+            } else {
+                readyBody.innerHTML = ready.map(claim => `
+                    <tr>
+                        <td><input type="checkbox" value="${claim.id}" class="claim-checkbox" onchange="updateSelected()"></td>
+                        <td class="claim-id">${claim.id}</td>
+                        <td>${claim.userName}</td>
+                        <td style="color: #4caf50; font-weight: 600;">R ${claim.amount.toFixed(2)}</td>
+                        <td>ABSA ...1234</td>
+                        <td>${claim.approvedAt ? new Date(claim.approvedAt).toLocaleDateString() : '—'}</td>
+                    </tr>
+                `).join('');
+            }
+
+            const batchedBody = document.getElementById('batchedBody');
+            if (batches.length === 0) {
+                batchedBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #888; padding: 40px;">No batches exported yet</td></tr>';
+            } else {
+                batchedBody.innerHTML = batches.map(batch => `
+                    <tr>
+                        <td class="claim-id">${batch.id}</td>
+                        <td>${batch.claimCount}</td>
+                        <td style="color: #4caf50; font-weight: 600;">R ${batch.amount.toFixed(2)}</td>
+                        <td>${batch.format}</td>
+                        <td>${new Date(batch.createdAt).toLocaleDateString()}</td>
+                        <td><span class="badge badge-batched">Exported</span></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function updateSelected() {
+            const checkboxes = document.querySelectorAll('.claim-checkbox:checked');
+            selectedClaims = Array.from(checkboxes).map(cb => cb.value);
+            
+            const claims = ClaimFlow.getAllClaims();
+            const selectedTotal = claims
+                .filter(c => selectedClaims.includes(c.id))
+                .reduce((sum, c) => sum + c.amount, 0);
+
+            document.getElementById('selectedCount').textContent = selectedClaims.length;
+            document.getElementById('selectedAmount').textContent = 'R ' + selectedTotal.toFixed(2);
+        }
+
+        function toggleAll() {
+            const checkboxes = document.querySelectorAll('.claim-checkbox');
+            const selectAll = document.getElementById('selectAll');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateSelected();
+        }
+
+        function exportToACB() {
+            if (selectedClaims.length === 0) {
+                showToast('✗ Select claims to export');
+                return;
+            }
+
+            const claims = ClaimFlow.getAllClaims();
+            const claimsToExport = claims.filter(c => selectedClaims.includes(c.id));
+            const amount = claimsToExport.reduce((sum, c) => sum + c.amount, 0);
+
+            const batch = {
+                id: 'BATCH-ACB-' + Date.now().toString().slice(-6),
+                format: 'ACB',
+                claimCount: claimsToExport.length,
+                amount: amount,
+                createdAt: new Date().toISOString()
+            };
+
+            ClaimFlow.addBatch(batch);
+
+            // Update claim statuses
+            claimsToExport.forEach(claim => {
+                ClaimFlow.updateClaim(claim.id, {
+                    status: 'Batched',
+                    stage: 'reconciliation',
+                    batchId: batch.id,
+                    batchedAt: new Date().toISOString()
+                });
+            });
+
+            showToast(`✓ Exported ${claimsToExport.length} claims as ACB (${batch.id})`);
+            selectedClaims = [];
+            document.getElementById('selectAll').checked = false;
+            updateStats();
+            renderClaims();
+        }
+
+        function exportToNetBank() {
+            if (selectedClaims.length === 0) {
+                showToast('✗ Select claims to export');
+                return;
+            }
+
+            const claims = ClaimFlow.getAllClaims();
+            const claimsToExport = claims.filter(c => selectedClaims.includes(c.id));
+            const amount = claimsToExport.reduce((sum, c) => sum + c.amount, 0);
+
+            const batch = {
+                id: 'BATCH-NB-' + Date.now().toString().slice(-6),
+                format: 'NetBank XML',
+                claimCount: claimsToExport.length,
+                amount: amount,
+                createdAt: new Date().toISOString()
+            };
+
+            ClaimFlow.addBatch(batch);
+
+            claimsToExport.forEach(claim => {
+                ClaimFlow.updateClaim(claim.id, {
+                    status: 'Batched',
+                    stage: 'reconciliation',
+                    batchId: batch.id,
+                    batchedAt: new Date().toISOString()
+                });
+            });
+
+            showToast(`✓ Exported ${claimsToExport.length} claims as NetBank (${batch.id})`);
+            selectedClaims = [];
+            document.getElementById('selectAll').checked = false;
+            updateStats();
+            renderClaims();
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Initialize
+        updateStats();
+        renderClaims();
+
+        // Auto-refresh
+        setInterval(() => {
+            renderClaims();
+            updateStats();
+        }, 3000);
+    </script>
+</body>
+</html>
