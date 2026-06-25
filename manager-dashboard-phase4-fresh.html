@@ -29,7 +29,6 @@
             color: var(--text-primary);
         }
 
-        /* Navigation */
         nav {
             background: var(--card-bg);
             border-bottom: 1px solid var(--border);
@@ -69,14 +68,12 @@
             font-weight: 600;
         }
 
-        /* Container */
         .container {
             max-width: 1000px;
             margin: 0 auto;
             padding: 0 20px;
         }
 
-        /* Header */
         .dashboard-header {
             margin-bottom: 30px;
         }
@@ -88,7 +85,6 @@
             margin-bottom: 20px;
         }
 
-        /* Metrics */
         .metrics {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -117,7 +113,6 @@
             color: var(--text-primary);
         }
 
-        /* Tabs */
         .tabs {
             display: flex;
             gap: 0;
@@ -163,7 +158,6 @@
             display: block;
         }
 
-        /* Batch Cards */
         .batch-card {
             background: var(--card-bg);
             border: 1px solid var(--border);
@@ -243,9 +237,6 @@
             border-bottom: 1px solid var(--border);
         }
 
-        .detail-item {
-        }
-
         .detail-label {
             font-size: 11px;
             color: var(--text-secondary);
@@ -301,7 +292,6 @@
             cursor: not-allowed;
         }
 
-        /* Modal */
         .detail-modal-overlay {
             display: none;
             position: fixed;
@@ -466,7 +456,6 @@
     </style>
 </head>
 <body>
-    <!-- Navigation -->
     <nav>
         <div class="logo">🎯 Personal Claims App</div>
         <ul class="nav-links">
@@ -481,14 +470,11 @@
         <button class="logout-btn" onclick="logout()">LOGOUT</button>
     </nav>
 
-    <!-- Main Container -->
     <div class="container">
-        <!-- Header -->
         <div class="dashboard-header">
             <h1 class="dashboard-title">🎁 Manager Dashboard - Phase 4: Batch Approval</h1>
         </div>
 
-        <!-- Metrics -->
         <div class="metrics">
             <div class="metric-card">
                 <div class="metric-label">Pending Approval</div>
@@ -508,30 +494,25 @@
             </div>
         </div>
 
-        <!-- Tabs -->
         <div class="tabs">
             <button class="tab active" onclick="switchTab('pending')">PENDING APPROVAL</button>
             <button class="tab" onclick="switchTab('approved')">APPROVED</button>
             <button class="tab" onclick="switchTab('rejected')">REJECTED</button>
         </div>
 
-        <!-- PENDING APPROVAL TAB -->
         <div id="pending" class="tab-content active">
             <div id="pendingContainer"></div>
         </div>
 
-        <!-- APPROVED TAB -->
         <div id="approved" class="tab-content">
             <div id="approvedContainer"></div>
         </div>
 
-        <!-- REJECTED TAB -->
         <div id="rejected" class="tab-content">
             <div id="rejectedContainer"></div>
         </div>
     </div>
 
-    <!-- DETAIL MODAL -->
     <div id="detailModal" class="detail-modal-overlay">
         <div class="detail-modal">
             <button class="modal-close" onclick="closeDetails()">&times;</button>
@@ -552,31 +533,27 @@
 
     <script>
         const SUPABASE_URL = 'https://wxjcdhcohsuhyeokzmtd.supabase.co';
-        const EDGE_FUNCTION_URL = 'https://wxjcdhcohsuhyeokzmtd.supabase.co/functions/v1/manager-api';
+        const API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4amNoZGNvaHN1aHllb2t6bXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODUwMTMsImV4cCI6MjA5NjY2NTAxM30.ZgCfVEfMEpOW7TJRzJ6VyBLWHYm8DBdpP7pBxYCvFWY';
         
         let allBatches = [];
         let currentBatchData = null;
 
         async function init() {
-            const session = localStorage.getItem('supabaseSession');
-            if (!session) {
-                window.location.href = 'employee-dashboard-phase2.html';
-                return;
-            }
             await loadDashboard();
         }
 
         async function loadDashboard() {
             try {
-                const response = await fetch(`${EDGE_FUNCTION_URL}/batches`, {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/batches`, {
                     method: 'GET',
                     headers: {
+                        'apikey': API_KEY,
                         'Content-Type': 'application/json'
                     }
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const batches = await response.json();
@@ -647,7 +624,6 @@
             document.getElementById('modalTitle').textContent = `Batch #${batch.id} - Employee ${batch.employee_id}`;
             document.getElementById('modalInfo').textContent = `Profit Center: ${batch.profit_center} | Total: R ${(batch.total_amount || 0).toFixed(2)} | Created: ${batch.created_date ? batch.created_date.split('T')[0] : 'N/A'}`;
             
-            // Update button states
             const approveBtn = document.getElementById('modalApproveBtn');
             const rejectBtn = document.getElementById('modalRejectBtn');
             if (batch.status !== 'pending') {
@@ -669,10 +645,9 @@
                     return;
                 }
 
-                // Fetch transaction details
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/transactions?id=in.(${batch.transaction_ids.join(',')})`, {
                     headers: {
-                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4amNoZGNvaHN1aHllb2t6bXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODUwMTMsImV4cCI6MjA5NjY2NTAxM30.ZgCfVEfMEpOW7TJRzJ6VyBLWHYm8DBdpP7pBxYCvFWY'
+                        'apikey': API_KEY
                     }
                 });
 
@@ -728,13 +703,13 @@
             if (!currentBatchData) return;
             
             try {
-                const response = await fetch(`${EDGE_FUNCTION_URL}/batches`, {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/batches?id=eq.${currentBatchData.id}`, {
                     method: 'PATCH',
                     headers: {
+                        'apikey': API_KEY,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        batchId: currentBatchData.id,
                         status: 'approved'
                     })
                 });
@@ -758,13 +733,13 @@
             if (!reason) return;
 
             try {
-                const response = await fetch(`${EDGE_FUNCTION_URL}/batches`, {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/batches?id=eq.${currentBatchData.id}`, {
                     method: 'PATCH',
                     headers: {
+                        'apikey': API_KEY,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        batchId: currentBatchData.id,
                         status: 'rejected'
                     })
                 });
@@ -816,7 +791,6 @@
             window.location.href = 'employee-dashboard-phase2.html';
         }
 
-        // Initialize on load
         window.addEventListener('load', init);
     </script>
 </body>
