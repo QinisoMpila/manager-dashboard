@@ -1,0 +1,2487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#16202e; --muted:#5b6b7e; --paper:#f6f8fa; --surface:#ffffff;
+    --line:#e3e7ed; --accent:#0f766e; --accent-soft:#e6f2f0;
+    --pending:#b45309; --pending-soft:#fdf3e7;
+    --reject:#b91c1c; --reject-soft:#fbeaea;
+    --ok:#15803d; --ok-soft:#e9f4ec;
+    --flag:#9333ea; --flag-soft:#f3e8fd;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{ margin:0; background:var(--paper); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  .num{ font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  /* Login / register */
+  .auth-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .auth{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:32px; width:100%; max-width:380px; box-shadow:0 1px 3px rgba(20,32,46,.06); }
+  .auth.wide{ max-width:460px; }
+  .auth h1{ font-size:22px; margin:0 0 4px; } .auth h1 span{ color:var(--accent); }
+  .auth p.sub{ color:var(--muted); font-size:13.5px; margin:0 0 22px; }
+  .auth label{ display:block; font-size:13px; color:var(--muted); margin:14px 0 5px; }
+  .auth input, .auth select{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; color:var(--ink); }
+  .auth input:focus, .auth select:focus{ outline:none; border-color:var(--accent); }
+  .auth .go{ width:100%; margin-top:20px; background:var(--accent); color:#fff; border:none; padding:11px; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; }
+  .auth .go:hover{ background:#0b5d56; }
+  .auth .err{ background:var(--reject-soft); color:var(--reject); border:1px solid #f0caca; border-radius:8px; padding:10px 12px; font-size:13.5px; margin-top:16px; display:none; }
+  .auth .err.show{ display:block; }
+  .auth .switch{ text-align:center; margin-top:16px; font-size:13px; }
+  .auth .switch a{ color:var(--accent); text-decoration:none; cursor:pointer; }
+  .sectlabel{ margin-top:20px; color:var(--ink); font-weight:600; font-size:13.5px; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:520px){ .row2{ grid-template-columns:1fr; } }
+
+  /* Shell */
+  header.app{ background:var(--ink); color:#fff; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  header.app h1{ font-size:18px; font-weight:600; margin:0; } header.app h1 span{ color:#7fd1c8; font-weight:500; }
+  .me{ display:flex; align-items:center; gap:14px; font-size:13px; }
+  .me .who{ text-align:right; } .me .who b{ display:block; font-weight:600; } .me .who small{ color:#9fb0c0; }
+  .me button{ background:#1f2c3d; color:#fff; border:1px solid #2f3f54; border-radius:6px; padding:7px 12px; font-size:13px; cursor:pointer; }
+  .me button:hover{ background:#26364a; }
+  .badge{ background:var(--accent); color:#fff; font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:.4px; }
+
+  .wrap{ max-width:920px; margin:0 auto; padding:24px; }
+  .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:22px; flex-wrap:wrap; }
+  .tabs button{ background:none; border:none; padding:11px 16px; font-size:14px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tabs button:hover{ color:var(--ink); }
+  .tabs button.active{ color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .tabs button .pill{ background:var(--pending-soft); color:var(--pending); font-size:11px; font-weight:700; padding:1px 7px; border-radius:999px; margin-left:6px; }
+
+  .statusbar{ border-radius:var(--radius); padding:12px 16px; margin-bottom:18px; font-size:14px; display:none; }
+  .statusbar.show{ display:block; } .statusbar.info{ background:var(--accent-soft); color:var(--accent); }
+  .statusbar.err{ background:var(--reject-soft); color:var(--reject); border:1px solid #f0caca; }
+  .hint{ font-size:13px; color:var(--muted); margin:-6px 0 14px; }
+
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:24px; }
+  .card h2{ font-size:16px; margin:0 0 4px; } .card .sub{ color:var(--muted); font-size:13px; margin:0 0 20px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:560px){ .grid2{ grid-template-columns:1fr; } }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+  .field input, .field select{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; background:#fff; color:var(--ink); }
+  .field input:focus, .field select:focus{ outline:none; border-color:var(--accent); }
+  .primary{ background:var(--accent); color:#fff; border:none; padding:11px 20px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+  .primary:hover{ background:#0b5d56; }
+  .formmsg{ font-size:13.5px; margin-top:12px; } .formmsg.ok{ color:var(--ok); } .formmsg.err{ color:var(--reject); }
+
+  .subfilter{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+  .subfilter button{ border:1px solid var(--line); background:var(--surface); color:var(--muted); padding:5px 13px; border-radius:999px; font-size:13px; cursor:pointer; }
+  .subfilter button:hover{ border-color:var(--accent); color:var(--accent); }
+  .subfilter button.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .count{ font-size:13px; color:var(--muted); text-align:right; margin-bottom:10px; }
+
+  .claim{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .claim-top{ display:grid; grid-template-columns:1fr auto auto; gap:16px; align-items:center; }
+  .vendor{ font-weight:600; } .meta{ font-size:13px; color:var(--muted); margin-top:2px; }
+  .amount{ font-size:16px; font-weight:600; text-align:right; }
+  .claim-actions{ display:flex; gap:8px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); flex-wrap:wrap; }
+  .btn-sm{ padding:7px 14px; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; border:1px solid transparent; }
+  .btn-edit{ background:#fff; color:var(--accent); border-color:#cfe3e0; } .btn-edit:hover{ background:var(--accent-soft); }
+  .dropdown{ position:relative; display:inline-block; }
+  .dd-menu{ display:none; position:absolute; right:0; top:calc(100% + 4px); background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(15,42,40,.14); min-width:180px; z-index:40; overflow:hidden; }
+  .dd-menu.show{ display:block; }
+  .dd-item{ display:block; width:100%; text-align:left; background:#fff; border:none; padding:10px 14px; font-size:13.5px; color:var(--ink); cursor:pointer; }
+  .dd-item:hover{ background:var(--accent-soft); }
+  /* ---- mobile-first capture ---- */
+  .capture-card{ max-width:560px; }
+  .cap-receipt{ margin:4px 0 20px; }
+  .cap-dropzone{ text-align:center; padding:26px 18px; border:2px dashed var(--accent); background:var(--accent-soft); border-radius:14px; cursor:pointer; transition:background .15s; }
+  .cap-dropzone:hover{ background:#e2f1ef; }
+  .cap-cam-icon{ font-size:34px; line-height:1; margin-bottom:8px; }
+  .cap-dropzone .dz-text{ font-size:16px; font-weight:600; }
+  .cap-dropzone .dz-text a{ color:var(--accent); }
+  .cap-dropzone .dz-sub{ font-size:12px; color:var(--muted); margin-top:6px; }
+  .cap-essentials{ display:flex; flex-direction:column; gap:14px; }
+  .cap-row{ display:flex; gap:12px; }
+  .cap-row .field{ flex:1; min-width:0; }
+  .cap-input{ font-size:16px; padding:13px 14px; min-height:48px; }
+  .cap-details{ margin-top:22px; padding-top:16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:14px; }
+  .cap-details-label{ font-size:13px; font-weight:600; color:var(--muted); }
+  .cap-details-label span{ font-weight:400; }
+  .cap-submit{ width:100%; margin-top:22px; min-height:52px; font-size:16px; }
+  #f-mileage-calc{ margin:0; }
+  @media(max-width:560px){ .capture-card{ padding:18px 16px; } .cap-row{ flex-direction:column; gap:14px; } }
+  .dash-stats{ display:flex; gap:14px; flex-wrap:wrap; margin:18px 0 20px; }
+  .dash-stat{ flex:1; min-width:150px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; }
+  .dash-stat .val{ font-size:24px; font-weight:700; color:var(--ink); }
+  .dash-stat .lbl{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+  .dash-charts{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .dash-charts .card h3{ margin:0 0 12px; font-size:15px; }
+  @media(max-width:800px){ .dash-charts{ grid-template-columns:1fr; } }
+  .cfg-layout{ display:flex; gap:24px; align-items:flex-start; }
+  .subnav{ display:flex; flex-direction:column; gap:2px; flex:0 0 200px; border-right:1px solid var(--line); padding-right:16px; }
+  .subnav button{ background:transparent; border:none; border-left:2px solid transparent; text-align:left; padding:10px 14px; font-size:14px; font-weight:500; color:var(--muted); cursor:pointer; border-radius:0 6px 6px 0; }
+  .subnav button:hover{ color:var(--ink); background:var(--accent-soft); }
+  .subnav button.active{ color:var(--accent); border-left-color:var(--accent); font-weight:600; background:var(--accent-soft); }
+  .cfg-content{ flex:1; min-width:0; }
+  @media(max-width:640px){ .cfg-layout{ flex-direction:column; } .subnav{ flex-basis:auto; flex-direction:row; flex-wrap:wrap; border-right:none; border-bottom:1px solid var(--line); padding-right:0; padding-bottom:8px; } .subnav button{ border-left:none; border-bottom:2px solid transparent; } .subnav button.active{ border-left:none; border-bottom-color:var(--accent); } }
+  .btn-submit2{ background:var(--accent); color:#fff; } .btn-submit2:hover{ background:#0b5d56; }
+  .btn-del{ background:#fff; color:var(--reject); border-color:#e9c4c4; } .btn-del:hover{ background:var(--reject-soft); }
+  .note{ font-size:12.5px; color:var(--muted); margin-top:10px; }
+  .rejected-note{ font-size:13px; color:var(--reject); margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+  .rc{ font-size:13px; color:var(--muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+  .rc-file{ color:var(--ink); font-weight:500; }
+  .rc-link{ color:var(--accent); font-weight:500; cursor:pointer; text-decoration:none; }
+  .rc-link:hover{ text-decoration:underline; }
+  .rc-del{ color:var(--reject); }
+  .dropzone{ margin-top:12px; border:1.5px dashed var(--line); border-radius:9px; padding:16px; text-align:center; transition:all .15s; }
+  .dropzone.drag{ border-color:var(--accent); background:var(--accent-soft); }
+  .dz-text{ font-size:13.5px; color:var(--ink); }
+  .dz-sub{ font-size:12px; color:var(--muted); margin-top:5px; }
+
+  .batch{ background:var(--surface); border:1px solid var(--line); border-radius:10px; margin-bottom:12px; overflow:hidden; }
+  .batch.flagged{ border-color:#e3c2f5; }
+  .batch-head{ display:grid; grid-template-columns:1fr auto auto; gap:16px; align-items:center; padding:16px 18px; cursor:pointer; }
+  .batch-head:hover{ background:#fafbfc; }
+  .who{ font-weight:600; }
+  .amt2{ font-size:17px; font-weight:600; text-align:right; } .amt2 small{ display:block; font-size:11px; color:var(--muted); font-weight:400; }
+  .chip{ font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; white-space:nowrap; text-transform:capitalize; }
+  .chip.draft{ background:#eef1f5; color:var(--muted); } .chip.pending{ background:var(--pending-soft); color:var(--pending); }
+  .chip.approved{ background:var(--ok-soft); color:var(--ok); } .chip.rejected{ background:var(--reject-soft); color:var(--reject); }
+  .chip.neutral{ background:#e7eef7; color:#3a5a82; } .chip.flag{ background:var(--flag-soft); color:var(--flag); }
+  .body{ display:none; border-top:1px solid var(--line); padding:4px 18px 18px; } .body.open{ display:block; }
+  table{ width:100%; border-collapse:collapse; margin-top:10px; font-size:13.5px; }
+  th{ text-align:left; color:var(--muted); font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.4px; padding:8px; border-bottom:1px solid var(--line); }
+  td{ padding:9px 8px; border-bottom:1px solid #eef1f5; vertical-align:top; } td.r{ text-align:right; } tr:last-child td{ border-bottom:none; }
+  .receipt{ color:var(--accent); text-decoration:none; font-size:12.5px; font-weight:500; } .receipt:hover{ text-decoration:underline; }
+  .noreceipt{ color:var(--muted); font-size:12.5px; }
+  .route{ font-size:12.5px; color:var(--muted); margin-top:12px; padding:10px 12px; background:#fafbfc; border:1px solid var(--line); border-radius:8px; } .route b{ color:var(--ink); }
+  .actions{ display:flex; gap:10px; margin-top:14px; }
+  .btn{ padding:9px 18px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; border:1px solid transparent; }
+  .btn-approve{ background:var(--accent); color:#fff; } .btn-approve:hover{ background:#0b5d56; }
+  .btn-reject{ background:#fff; color:var(--reject); border-color:#e9c4c4; } .btn-reject:hover{ background:var(--reject-soft); }
+  .decided{ font-size:13px; color:var(--muted); margin-top:14px; padding-top:14px; border-top:1px solid var(--line); } .decided b{ color:var(--ink); }
+
+  .empty{ text-align:center; padding:50px 20px; color:var(--muted); } .empty h3{ color:var(--ink); margin:0 0 6px; }
+  .spinner{ display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .modal{ display:none; position:fixed; inset:0; background:rgba(20,32,46,.45); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+  .modal.open{ display:flex; }
+  .modal-card{ background:#fff; border-radius:12px; padding:26px; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; }
+  .modal-card h3{ margin:0 0 16px; font-size:17px; }
+  .modal-actions{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .ghost{ background:#fff; color:var(--muted); border:1px solid var(--line); } .ghost:hover{ background:var(--paper); }
+  .checks label{ display:inline-flex; align-items:center; gap:6px; margin-right:16px; font-size:13px; color:var(--ink); }
+  .toast{ position:fixed; bottom:20px; right:20px; background:var(--ink); color:#fff; padding:13px 18px; border-radius:8px; font-size:13.5px; z-index:2000; box-shadow:0 4px 16px rgba(20,32,46,.2); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="auth-wrap" id="loginScreen">
+  <div class="auth">
+    <h1>Claim<span>Flow</span></h1>
+    <p class="sub">Sign in to submit, track, and review expense claims.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" placeholder="you@claimflow.test">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="........">
+    <button class="go" id="loginBtn">Sign in</button>
+    <div class="err" id="loginErr"></div>
+    <div class="switch">New here? <a id="toRegister">Create an account</a></div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div class="auth-wrap" id="registerScreen" style="display:none">
+  <div class="auth wide">
+    <h1>Create your <span>ClaimFlow</span> account</h1>
+    <p class="sub">HR will review your account before you can sign in.</p>
+    <div class="row2">
+      <div><label>First name</label><input id="r-name"></div>
+      <div><label>Surname</label><input id="r-surname"></div>
+    </div>
+    <label>Employee number</label><input id="r-empno" placeholder="your staff/employee number">
+    <label>Email</label><input id="r-email" type="email" placeholder="you@m802.co.za">
+    <div class="meta" id="r-email-hint" style="margin-top:5px">Use your company email address (@m802.co.za).</div>
+    <label>Password</label><input id="r-password" type="password">
+    <label>Department</label><input id="r-dept" placeholder="e.g. Finance, Operations">
+    <label>Your line manager</label><select id="r-manager"><option value="">Select…</option></select>
+    <div class="sectlabel">Banking details (for your refunds)</div>
+    <label>Bank name</label><input id="r-bankname" placeholder="e.g. ABSA, FNB, Capitec">
+    <div class="row2">
+      <div><label>Branch / bank code</label><input id="r-bankcode"></div>
+      <div><label>Account number</label><input id="r-account"></div>
+    </div>
+    <button class="go" id="registerBtn">Submit registration</button>
+    <div class="err" id="regErr"></div>
+    <div class="switch"><a id="toLogin">Back to sign in</a></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <header class="app">
+    <h1>Claim<span>Flow</span></h1>
+    <div class="me">
+      <div class="who"><b id="meName"></b><small id="meEmail"></small></div>
+      <span class="badge" id="meBadge"></span>
+      <button id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div id="statusbar" class="statusbar"></div>
+    <div id="notifBanner" style="display:none;background:var(--pending-soft);border:1px solid #f0d9b3;color:var(--pending);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px;cursor:pointer"></div>
+    <div class="tabs" id="tabs"></div>
+
+    <div id="view-new" class="view" style="display:none">
+      <div class="card capture-card">
+        <h2>New expense claim</h2>
+        <p class="sub">Snap the receipt, fill the essentials, submit. Saved as a draft first — you can edit it until you submit for approval.</p>
+        <div id="fundingBanner" style="display:none"></div>
+
+        <!-- 1. Receipt first, camera-led -->
+        <div class="cap-receipt">
+          <div class="dropzone cap-dropzone" id="f-drop">
+            <div class="cap-cam-icon">📷</div>
+            <div class="dz-text" id="f-dropText"><a class="rc-link" id="f-choose">Take a photo or attach a receipt</a></div>
+            <div class="dz-sub">On your phone this opens the camera or your files · image or PDF, up to 5MB · optional, you can add it later</div>
+          </div>
+        </div>
+
+        <!-- 2. Essentials, big and fast -->
+        <div class="cap-essentials">
+          <div class="field"><label>Category</label>
+            <select id="f-category" class="cap-input"><option value="">Select…</option>
+              <option value="meal">Meal</option><option value="travel">Travel</option>
+              <option value="accommodation">Accommodation</option><option value="mileage">Mileage</option><option value="other">Other</option></select>
+          </div>
+          <div class="field" id="f-amount-wrap"><label>Amount (R)</label><input id="f-amount" class="cap-input" type="number" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+          <div class="field" id="f-km-wrap" style="display:none"><label>Kilometres travelled</label><input id="f-km" class="cap-input" type="number" inputmode="decimal" step="0.1" placeholder="e.g. 142"></div>
+          <div id="f-mileage-calc" class="note" style="display:none"></div>
+          <div class="cap-row">
+            <div class="field"><label>Profit centre</label><select id="f-pc" class="cap-input"><option value="">Select…</option></select></div>
+            <div class="field"><label>Claim date</label><input id="f-date" class="cap-input" type="date"></div>
+          </div>
+        </div>
+
+        <!-- 3. Optional details, secondary -->
+        <div class="cap-details">
+          <div class="cap-details-label">Details <span>(optional — helps approval)</span></div>
+          <div class="field"><label>Vendor</label><input id="f-vendor" class="cap-input" type="text" placeholder="e.g. Uber, Restaurant ABC"></div>
+          <div class="field"><label>Additional notes</label><input id="f-notes" class="cap-input" type="text" placeholder="anything the approver should know"></div>
+        </div>
+
+        <button class="primary cap-submit" id="saveDraftBtn">Save as draft</button>
+        <div id="formMsg" class="formmsg"></div>
+      </div>
+    </div>
+
+    <div id="view-claims" class="view" style="display:none">
+      <div class="subfilter" id="claimsFilter"></div>
+      <div class="count" id="claimsCount"></div>
+      <div id="claimsList"></div>
+    </div>
+
+    <div id="view-batches" class="view" style="display:none">
+      <div class="hint" id="batchesHint"></div>
+      <div class="count" id="batchesCount"></div>
+      <div id="batchesList"></div>
+    </div>
+
+    <div id="view-hr" class="view" style="display:none">
+      <div class="hint">New sign-ups awaiting your review, plus a history of approved and rejected accounts.</div>
+      <div id="hrDeactivations"></div>
+      <div class="cfg-layout">
+        <div class="subnav" id="hrFilter"></div>
+        <div class="cfg-content">
+          <div class="count" id="hrCount"></div>
+          <div id="hrList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-export" class="view" style="display:none">
+      <div class="hint">Approved claims, grouped by profit centre. Export a centre to generate its NetBank Business payment file — each batch is a separate payment line. Exporting marks those batches as sent for payment.</div>
+      <div class="card" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+        <div><div style="font-weight:600;font-size:14px">Generate approval batches</div><div class="meta">Group all submitted claims into batches for approval — the weekly batch job, on demand.</div></div>
+        <button class="primary" id="genBatchesBtn" style="white-space:nowrap">Generate batches now</button>
+      </div>
+      <div class="count" id="exportCount"></div>
+      <div id="exportList"></div>
+      <div id="recentExports"></div>
+    </div>
+
+    <div id="view-audit" class="view" style="display:none">
+      <div class="hint">A permanent, tamper-evident record of every key action — newest first. Each entry is chained to the one before it, so any change is detectable.</div>
+      <div id="auditVerify" style="margin-bottom:14px"></div>
+      <div class="cfg-layout">
+        <div class="subnav" id="auditFilter"></div>
+        <div class="cfg-content">
+          <div class="count" id="auditCount"></div>
+          <div id="auditList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-admin" class="view" style="display:none">
+      <div class="hint">Company configuration you manage. Every change here is recorded in the audit log.</div>
+      <div class="cfg-layout">
+      <div class="subnav" id="cfgNav"></div>
+      <div class="cfg-content">
+      <div class="cfg-section" data-cfg="company">
+      <div class="card">
+        <h2>Company details</h2>
+        <p class="sub">Your company name, and the email domains people may register with. Only addresses on these domains can create an account — HR still approves every one.</p>
+        <div class="field" style="max-width:360px"><label>Company name</label><input id="cfg-coname" type="text" placeholder="e.g. your company's name"></div>
+        <div class="field"><label>Allowed email domains</label><input id="cfg-codomains" type="text" placeholder="m802.co.za, claimflow.test"><div class="hint" style="margin-top:5px">Comma-separated, without the @. Remove <b>claimflow.test</b> when you go live so only real company addresses can register.</div></div>
+        <button class="primary" id="cfgCompanyBtn">Save company details</button>
+      </div>
+      </div>
+      <div class="cfg-section" data-cfg="rates" style="display:none">
+      <div class="card">
+        <h2>Mileage rates</h2>
+        <p class="sub">The per-kilometre rate used to calculate mileage claims. The rate effective on a claim's date is applied automatically. Editing a rate affects future calculations only — claims already saved keep their original amount.</p>
+        <div id="ratesList" style="margin-bottom:16px"></div>
+        <div style="border-top:1px solid var(--line);padding-top:16px">
+          <div style="font-weight:600;font-size:14px;margin-bottom:12px">Add a new rate</div>
+          <div class="grid2">
+            <div class="field"><label>Effective from</label><input id="rate-date" type="date"></div>
+            <div class="field"><label>Rate (R per km)</label><input id="rate-amt" type="number" step="0.01" placeholder="e.g. 4.95"></div>
+          </div>
+          <div class="field"><label>Notes (optional)</label><input id="rate-notes" type="text" placeholder="e.g. rate period"></div>
+          <button class="primary" id="rateAddBtn">Add rate</button>
+        </div>
+      </div>
+      </div>
+      <div class="cfg-section" data-cfg="centres" style="display:none">
+      <div class="card">
+        <h2>Profit centres</h2>
+        <p class="sub">The cost centres claims are captured against. Claims and approvals draw from this list. A centre's paying account must be approved by Finance before payments can be exported.</p>
+        <div id="centresList" style="margin-bottom:16px"></div>
+        <div style="border-top:1px solid var(--line);padding-top:16px">
+          <div style="font-weight:600;font-size:14px;margin-bottom:12px">Add a profit centre</div>
+          <div class="grid2">
+            <div class="field"><label>Code</label><input id="pc-code" type="text" placeholder="e.g. PC004"></div>
+            <div class="field"><label>Name (optional)</label><input id="pc-name" type="text" placeholder="leave blank for now"></div>
+          </div>
+          <div class="field"><label>Paying bank account (optional)</label><input id="pc-account" type="text" placeholder="account to debit for this centre's payments"></div>
+          <button class="primary" id="pcAddBtn">Add profit centre</button>
+        </div>
+      </div>
+      </div>
+      <div class="cfg-section" data-cfg="thresholds" style="display:none">
+      <div class="card">
+        <h2>Approval thresholds</h2>
+        <p class="sub">Claim batches above this amount are escalated straight to a Director for approval, bypassing the profit-centre manager.</p>
+        <div class="field" style="max-width:280px"><label>Escalation threshold (R)</label><input id="cfg-threshold" type="number" step="1"></div>
+        <button class="primary" id="cfgThresholdBtn">Save threshold</button>
+        <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px">
+          <p class="sub" style="margin-top:0">Duplicate-claim alarms ignore matches below this amount (small identical amounts are common and rarely fraud). Duplicate receipts are always flagged regardless.</p>
+          <div class="field" style="max-width:280px"><label>Duplicate-alarm floor (R)</label><input id="cfg-dupfloor" type="number" step="1"></div>
+          <button class="primary" id="cfgDupFloorBtn">Save floor</button>
+        </div>
+      </div>
+      </div>
+      </div>
+      </div>
+    </div>
+
+    <div id="view-team" class="view" style="display:none">
+      <div class="hint">Your direct reports. You can request that HR deactivate a report — HR reviews and actions the request.</div>
+      <div id="teamList"></div>
+    </div>
+
+    <div id="view-reports" class="view" style="display:none">
+      <div class="hint">Export captured expenses to a spreadsheet — filter by date, status and profit centre, then download to Excel or CSV to post into your accounting package.</div>
+      <div class="card">
+        <div class="grid2">
+          <div class="field"><label>From date</label><input id="rep-from" type="date"></div>
+          <div class="field"><label>To date</label><input id="rep-to" type="date"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Status</label>
+            <select id="rep-status">
+              <option value="">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="pending_approval">Awaiting approval</option>
+              <option value="batched">Batched</option>
+              <option value="exported">Sent for payment</option>
+              <option value="reconciled">Payment successful</option>
+            </select>
+          </div>
+          <div class="field"><label>Profit centre</label><select id="rep-pc"><option value="">All centres</option></select></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+          <button class="primary" id="repPreviewBtn">Preview</button>
+          <button class="primary" id="repXlsxBtn">Download Excel (.xlsx)</button>
+          <button class="primary ghost" id="repCsvBtn">Download CSV</button>
+        </div>
+      </div>
+      <div class="count" id="repCount" style="margin-top:16px"></div>
+      <div id="repPreview"></div>
+    </div>
+
+    <div id="view-dashboard" class="view" style="display:none">
+      <div class="hint">A visual overview of claims. Managers can switch between their profit centres and their team; drafts are excluded.</div>
+      <div class="subnav" id="dashControls" style="flex-direction:row;flex-wrap:wrap;border-right:none;border-bottom:1px solid var(--line);padding-right:0;padding-bottom:8px;flex-basis:auto"></div>
+      <div id="dashStats" class="dash-stats"></div>
+      <div id="dashMsg"></div>
+      <div class="dash-charts" id="dashCharts">
+        <div class="card"><h3>By category</h3><div style="position:relative;height:260px"><canvas id="chartCategory"></canvas></div></div>
+        <div class="card"><h3>By profit centre</h3><div style="position:relative;height:260px"><canvas id="chartCentre"></canvas></div></div>
+        <div class="card" style="grid-column:1/-1"><h3>Top claimants</h3><div style="position:relative;height:300px"><canvas id="chartEmployee"></canvas></div></div>
+      </div>
+    </div>
+
+    <div id="view-petty" class="view" style="display:none">
+      <div class="hint">Money advanced to you, and what you have spent from it. This is separate from your expense claims — nothing here is paid back to you.</div>
+      <div id="pettyBalance"></div>
+      <div style="margin:18px 0;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="primary" id="pcRequestBtn">Request an advance</button>
+        <button class="primary ghost" id="pcSpendBtn">Capture an expense paid from petty cash</button>
+      </div>
+      <div id="pettyList"></div>
+    </div>
+
+    <div id="view-pettyfin" class="view" style="display:none">
+      <div class="hint">Petty cash you have issued. Balances update as receipts are approved — no month-end reconstruction.</div>
+      <div id="pcRequests"></div>
+      <div id="pcHolders"></div>
+    </div>
+
+    <div id="view-pettyteam" class="view" style="display:none">
+      <div class="hint">Petty cash held by your direct reports. Read-only — issuing and close-out sit with Finance.</div>
+      <div id="pcTeam"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal" id="editModal">
+  <div class="modal-card">
+    <h3>Edit draft claim</h3>
+    <div class="grid2">
+      <div class="field"><label>Category</label>
+        <select id="e-category"><option value="meal">Meal</option><option value="travel">Travel</option>
+          <option value="accommodation">Accommodation</option><option value="mileage">Mileage</option><option value="other">Other</option></select>
+      </div>
+      <div class="field" id="e-amount-wrap"><label>Amount (R)</label><input id="e-amount" type="number" step="0.01"></div>
+      <div class="field" id="e-km-wrap" style="display:none"><label>Kilometres travelled</label><input id="e-km" type="number" step="0.1"></div>
+    </div>
+    <div id="e-mileage-calc" class="note" style="display:none;margin-top:-4px;margin-bottom:16px"></div>
+    <div class="grid2">
+      <div class="field"><label>Profit centre</label><select id="e-pc"></select></div>
+      <div class="field"><label>Claim date</label><input id="e-date" type="date"></div>
+    </div>
+    <div class="field"><label>Vendor / description</label><input id="e-vendor" type="text"></div>
+    <div class="field"><label>Notes</label><input id="e-notes" type="text"></div>
+    <div class="modal-actions">
+      <button class="primary" id="saveEditBtn">Save changes</button>
+      <button class="btn-sm btn-submit2" id="submitApprovalBtn" style="padding:11px">Submit for approval</button>
+      <button class="primary ghost" id="closeEditBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- HR review modal -->
+<div class="modal" id="hrModal">
+  <div class="modal-card">
+    <h3>Review registration</h3>
+    <div id="hrSummary" class="meta" style="margin-bottom:16px"></div>
+    <div class="field"><label>Role</label>
+      <select id="hr-role">
+        <option value="Employee">Employee</option><option value="Manager">Manager</option>
+        <option value="Director">Director</option><option value="Finance">Finance</option>
+        <option value="HR">HR</option><option value="IT Administrator">IT Administrator</option>
+      </select>
+    </div>
+    <div class="field" id="hr-centres-wrap" style="display:none">
+      <label>Manages these profit centres</label>
+      <div id="hr-centres" class="checks"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="primary" id="hrApproveBtn">Approve account</button>
+      <button class="btn-sm btn-del" id="hrRejectBtn" style="padding:11px">Reject…</button>
+      <button class="primary ghost" id="hrCloseBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reconcile (confirm payment) modal -->
+<div class="modal" id="recModal">
+  <div class="modal-card">
+    <h3>Confirm payment</h3>
+    <div id="recSummary" class="meta" style="margin-bottom:8px"></div>
+    <p class="hint" style="margin:0 0 16px">Enter the bank's own reference for this payment run and the date it was paid. This closes the run and marks the claims “Payment successful”.</p>
+    <div class="field"><label>Bank payment reference</label><input id="rec-ref" type="text" placeholder="the bank's reference for this run"></div>
+    <div class="field"><label>Date paid</label><input id="rec-date" type="date"></div>
+    <div class="modal-actions">
+      <button class="primary" id="recConfirmBtn">Mark as paid</button>
+      <button class="primary ghost" id="recCloseBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export (format picker) modal -->
+<div class="modal" id="expModal">
+  <div class="modal-card">
+    <h3>Export payment run</h3>
+    <div id="expSummary" class="meta" style="margin-bottom:16px"></div>
+    <div class="field"><label>Bank format</label>
+      <div style="padding:10px 12px;background:var(--accent-soft);border:1px solid #cfe3e0;border-radius:8px;font-size:14px;font-weight:500;color:var(--ink)">NetBank Business (secure) — Nedbank</div>
+    </div>
+    <div id="exp-netbank-fields">
+      <div class="field"><label>From account (the account to be debited)</label><input id="exp-from" type="text" placeholder="your paying account for this profit centre"><div id="exp-from-note" class="hint" style="margin-top:5px"></div></div>
+      <div class="field"><label>NetBank Business seed</label><input id="exp-seed" type="password" autocomplete="off" placeholder="32-character profile seed from Nedbank"></div>
+      <p class="hint" style="margin:0 0 4px">The seed signs the file so Nedbank can confirm it came from you. It is used once to generate the file and is never stored.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="primary" id="expGoBtn">Generate file</button>
+      <button class="primary ghost" id="expCloseBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- HR: edit an existing user -->
+<div class="modal" id="hrEditModal">
+  <div class="modal-card">
+    <h3>Edit user record</h3>
+    <p class="hint" style="margin:0 0 14px">Any change is logged and sent to the employee to review. Changing banking details holds their payments until they confirm the new account.</p>
+    <div class="grid2">
+      <div class="field"><label>First name</label><input id="he-name"></div>
+      <div class="field"><label>Surname</label><input id="he-surname"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Department</label><input id="he-dept"></div>
+      <div class="field"><label>Line manager</label><select id="he-manager"></select></div>
+    </div>
+    <div class="field"><label>Role</label>
+      <select id="he-role">
+        <option value="Employee">Employee</option><option value="Manager">Manager</option>
+        <option value="Director">Director</option><option value="Finance">Finance</option>
+        <option value="HR">HR</option><option value="IT Administrator">IT Administrator</option>
+      </select>
+    </div>
+    <div class="field" id="he-centres-wrap" style="display:none"><label>Manages these profit centres</label><div id="he-centres" class="checks"></div></div>
+    <div class="field"><label>Bank name</label><input id="he-bankname"></div>
+    <div class="grid2">
+      <div class="field"><label>Branch / bank code</label><input id="he-bankcode"></div>
+      <div class="field"><label>Account number</label><input id="he-account"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="primary" id="heSaveBtn">Save changes</button>
+      <button class="primary ghost" id="heCloseBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Employee: notifications to acknowledge -->
+<div class="modal" id="notifModal">
+  <div class="modal-card">
+    <h3>Updates to your account</h3>
+    <p class="hint" style="margin:0 0 14px">HR has made changes to your record. Please review them.</p>
+    <div id="notifList"></div>
+    <div class="modal-actions">
+      <button class="primary ghost" id="notifCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Petty cash drill-in -->
+<div class="modal" id="pcDrillModal">
+  <div class="modal-card" style="max-width:660px">
+    <h3 id="pcDrillTitle">Petty cash detail</h3>
+    <div id="pcDrillBody" style="max-height:70vh;overflow:auto"></div>
+    <div class="modal-actions">
+      <button class="primary ghost" id="pcDrillCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin: edit a mileage rate -->
+<div class="modal" id="rateModal">
+  <div class="modal-card">
+    <h3>Edit mileage rate</h3>
+    <div class="grid2">
+      <div class="field"><label>Effective from</label><input id="er-date" type="date"></div>
+      <div class="field"><label>Rate (R per km)</label><input id="er-amt" type="number" step="0.01"></div>
+    </div>
+    <div class="field"><label>Status</label><select id="er-status"><option value="active">active</option><option value="inactive">inactive</option></select></div>
+    <div class="field"><label>Notes</label><input id="er-notes" type="text"></div>
+    <div class="modal-actions">
+      <button class="primary" id="erSaveBtn">Save changes</button>
+      <button class="primary ghost" id="erCloseBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin: edit a profit centre -->
+<div class="modal" id="pcModal">
+  <div class="modal-card">
+    <h3>Edit profit centre</h3>
+    <div class="field"><label>Code</label><input id="epc-code" type="text"></div>
+    <div class="field"><label>Name (optional)</label><input id="epc-name" type="text"></div>
+    <div class="field"><label>Paying bank account</label><input id="epc-account" type="text" placeholder="account to debit for this centre's payments"></div>
+    <div class="field"><label>Status</label><select id="epc-status"><option value="active">active</option><option value="inactive">inactive</option></select></div>
+    <p class="hint" style="margin:0 0 6px">Changing a code does not update claims already captured under the old code.</p>
+    <div class="modal-actions">
+      <button class="primary" id="epcSaveBtn">Save changes</button>
+      <button class="primary ghost" id="epcCloseBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shared hidden file input for receipt uploads -->
+<input type="file" id="rcInput" accept="image/*,application/pdf" style="display:none">
+
+<script>
+const SUPABASE_URL = 'https://wxjchdcohsuhyeokzmtd.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_IY6JOZpXAkLlHG0uUAfbeg_7roRDcEg';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = s => document.querySelector(s);
+const rand = new Intl.NumberFormat('en-ZA', { style:'currency', currency:'ZAR' });
+const money = n => rand.format(Number(n || 0));
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+const fmtDateTime = d => d ? new Date(d).toLocaleString('en-ZA',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+const nameOf = id => userMap[id] ? `${userMap[id].name} ${userMap[id].surname}` : ('User #' + id);
+const roleOf = id => userMap[id] ? userMap[id].role : null;
+async function notifyFinance(type, message, details){
+  const finance = Object.values(userMap).filter(u=>u.role==='Finance' && (u.status||'').toLowerCase()==='approved');
+  if(!finance.length) return;
+  const rows = finance.map(u=>({ recipient_id:u.id, type, message, details: details?JSON.stringify(details):null, requires_bank_ack:false, acknowledged:false, created_at:new Date().toISOString() }));
+  try{ await sb.from('notifications').insert(rows); }catch(e){ console.warn('notifyFinance failed', e); }
+}
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function setStatus(m,k){ const el=$('#statusbar'); if(!m){el.className='statusbar';el.innerHTML='';return;} el.className='statusbar show '+(k||'info'); el.innerHTML=m; }
+function explain(e){ const m=(e&&e.message?e.message:String(e)).toLowerCase();
+  if(m.includes('permission denied')||m.includes('row-level security')) return 'The database is blocking access (Row Level Security).';
+  if(m.includes('failed to fetch')) return 'Could not reach Supabase. Check you are online.';
+  return e&&e.message?e.message:String(e); }
+
+// ===== audit log (append-only, hash-chained, tamper-evident) =====
+const GENESIS_HASH = '0'.repeat(64);
+function auditCanonical(e){ return [e.ts, e.actor_id==null?'':e.actor_id, e.action, e.target_type||'', e.target_id||'', e.summary||'', e.details||'', e.prev_hash].join('|'); }
+async function audit(action, targetType, targetId, summary, details, actorOverride){
+  try{
+    const a = actorOverride || (me ? { id:me.id, name:`${me.name} ${me.surname}`, role:me.role } : { id:null, name:'system', role:null });
+    const { error } = await sb.rpc('write_audit', {
+      p_action: action,
+      p_target_type: targetType||null,
+      p_target_id: targetId==null?null:String(targetId),
+      p_summary: summary||'',
+      p_details: details? JSON.stringify(details) : null,
+      p_actor_id: a.id,
+      p_actor_name: a.name,
+      p_actor_role: a.role
+    });
+    if(error) console.warn('audit log write failed', error);
+  }catch(e){ console.warn('audit log write failed', e); }
+}
+async function verifyAuditChain(){
+  const { data:rows, error } = await sb.from('audit_log').select('*').order('id',{ascending:true});
+  if(error) return { ok:false, reason:explain(error) };
+  if(!rows || !rows.length) return { ok:true, count:0 };
+  let prev = GENESIS_HASH;
+  for(const e of rows){
+    if((e.prev_hash||'') !== prev) return { ok:false, brokenAt:e.id, reason:'a record is missing or out of order' };
+    const h = await sha256(auditCanonical(e));
+    if(h !== e.hash) return { ok:false, brokenAt:e.id, reason:'a record was altered' };
+    prev = e.hash;
+  }
+  return { ok:true, count:rows.length };
+}
+
+let me=null, activeTab='', claimFilter='All';
+let userMap={}, authorityMap={}, profitCentres=[], allCentres=[], appConfig={}, deactRequests=[];
+let captureFunding='own', captureAdvanceId=null, pcAdvRows=[], myAdvances=[], allAdvances=[];
+let allBatches=[], myBatches=[], myTxns=[], editingId=null;
+let myDocs={}, uploadTxn=null, pendingReceipt=null, mileageRates=[];
+let hrPending=[], hrPendingCount=0, hrEditingUser=null, hrEditUser=null, myNotifs=[];
+
+// ===== routing =====
+function escThreshold(){ return Number((appConfig && appConfig.escalation_threshold) || 15000); }
+function approverFor(b){ const r=roleOf(b.employee_id);
+  if(r==='Director') return {tier:'self'};
+  if(r==='Manager')  return {tier:'director'};
+  if(Number(b.total_amount||0) > escThreshold()) return {tier:'director', escalated:true};
+  return {tier:'manager', managerIds: authorityMap[b.profit_center]||[]}; }
+function isPending(b){ return (b.status||'').toLowerCase()==='pending'; }
+function canIActOn(b){ if(!isPending(b)) return false; const a=approverFor(b);
+  if(me.role==='Director'&&a.tier==='director') return true;
+  if(me.role==='Director'&&a.tier==='self'&&b.employee_id===me.id) return true;
+  if(me.role==='Manager'&&a.tier==='manager'&&a.managerIds.includes(me.id)) return true;
+  return false; }
+function myCentres(){ return Object.keys(authorityMap).filter(pc=>authorityMap[pc].includes(me.id)); }
+
+// ===== auth screens =====
+function showRegister(){ $('#loginScreen').style.display='none'; $('#registerScreen').style.display='flex'; loadManagersForRegister(); }
+function showLogin(){ $('#registerScreen').style.display='none'; $('#loginScreen').style.display='flex'; }
+
+async function loadManagersForRegister(){
+  const { data } = await sb.rpc('public_managers');
+  $('#r-manager').innerHTML='<option value="">Select…</option>'+(data||[]).map(u=>`<option value="${u.id}">${u.name} ${u.surname} (${u.role})</option>`).join('');
+}
+
+// Company details — read from Configuration; falls back to these if not set, so registration never breaks.
+let companyInfo = { company_name:'', email_domains:['m802.co.za','claimflow.test'] };
+function domainLabel(){ const d=companyInfo.email_domains; return d.map(x=>'@'+x).join(' or '); }
+async function loadCompanyInfo(){
+  try{
+    const { data } = await sb.rpc('company_info');
+    const row = Array.isArray(data) ? data[0] : data;
+    if(row){
+      companyInfo.company_name = row.company_name || '';
+      const list = (row.email_domains||'').split(',').map(s=>s.trim().toLowerCase().replace(/^@/,'')).filter(Boolean);
+      if(list.length) companyInfo.email_domains = list;
+    }
+  }catch(e){ /* keep the fallback */ }
+  const hint=$('#r-email-hint'); if(hint) hint.textContent = `Use your company email address (${domainLabel()}).`;
+  const inp=$('#r-email'); if(inp) inp.placeholder = 'you@'+companyInfo.email_domains[0];
+}
+function emailDomainOk(email){ return companyInfo.email_domains.some(d => email.toLowerCase().endsWith('@'+d)); }
+
+async function submitRegistration(){
+  const g=id=>$('#'+id).value.trim();
+  const name=g('r-name'),surname=g('r-surname'),empno=g('r-empno'),email=g('r-email').toLowerCase(),password=$('#r-password').value,
+        dept=g('r-dept'),manager=$('#r-manager').value,bankname=g('r-bankname'),bankcode=g('r-bankcode'),account=g('r-account');
+  const err=$('#regErr'); err.className='err';
+  if(!name||!surname||!empno||!email||!password||!manager||!bankname||!account){ err.className='err show'; err.textContent='Please complete name, surname, employee number, email, password, your manager, bank name and account number.'; return; }
+  if(!emailDomainOk(email)){ err.className='err show'; err.textContent=`Please register with your company email address (${domainLabel()}).`; return; }
+  $('#registerBtn').disabled=true;
+  // 1. create the Auth identity
+  const { data:signUp, error:serr } = await sb.auth.signUp({ email, password });
+  if(serr || !signUp || !signUp.user){
+    $('#registerBtn').disabled=false; err.className='err show';
+    err.textContent = 'Could not register: ' + ((serr && serr.message) || 'unknown error');
+    return;
+  }
+  // 2. create the linked profile row
+  const { error } = await sb.from('users').insert({
+    name, surname, email, department:dept, manager_id:Number(manager),
+    bank_name:bankname, bank_code:bankcode, bank_account:account,
+    role:'Employee', status:'pending', employee_number:empno, auth_id:signUp.user.id, created_at:new Date().toISOString()
+  });
+  $('#registerBtn').disabled=false;
+  if(error){
+    // roll back: don't leave an Auth identity without a profile
+    try{ await sb.auth.signOut(); }catch(e){}
+    const m=(error.message||'').toLowerCase();
+    err.className='err show';
+    if(m.includes('employee_number')) err.textContent='That employee number is already registered. Check your number, or contact HR.';
+    else if(m.includes('email')) err.textContent='An account with this email already exists.';
+    else err.textContent='Could not complete registration: '+explain(error)+' — please tell your administrator.';
+    return; }
+  try{ await sb.auth.signOut(); }catch(e){}
+  await audit('user.register','user',null,`New registration: ${name} ${surname} (${email}), dept ${dept||'—'}`,{email,department:dept,employee_number:empno},{id:null,name:`${name} ${surname}`,role:'(registrant)'});
+  $('#registerScreen').querySelector('.auth').innerHTML =
+    `<h1>Registration <span>received</span></h1><p class="sub">Thanks, ${name}. HR will review your account, and you'll be able to sign in once it's approved.</p><button class="go" onclick="location.reload()">Back to sign in</button>`;
+}
+
+// ===== login / session =====
+async function doLogin(){
+  const email=$('#email').value.trim().toLowerCase(), pw=$('#password').value, err=$('#loginErr'); err.className='err';
+  if(!email||!pw){ err.className='err show'; err.textContent='Enter your email and password.'; return; }
+  $('#loginBtn').disabled=true; $('#loginBtn').textContent='Signing in…';
+  const { data:auth, error:aerr } = await sb.auth.signInWithPassword({ email, password:pw });
+  if(aerr || !auth || !auth.user){
+    $('#loginBtn').disabled=false; $('#loginBtn').textContent='Sign in';
+    err.className='err show'; err.textContent='Email or password not recognised.'; return;
+  }
+  const data = await loadProfile(auth.user.id);
+  $('#loginBtn').disabled=false; $('#loginBtn').textContent='Sign in';
+  if(!data){ await sb.auth.signOut(); err.className='err show'; err.textContent='Your profile could not be found. Please contact HR.'; return; }
+  const lstat=(data.status||'').toLowerCase();
+  if(lstat==='inactive'){ await sb.auth.signOut(); err.className='err show'; err.textContent='This account has been deactivated. Please contact HR.'; return; }
+  if(lstat!=='approved'){ await sb.auth.signOut(); err.className='err show'; err.textContent='Your account has not been approved by HR yet.'; return; }
+  me=data;
+  await audit('auth.login','user',me.id,`${me.name} ${me.surname} signed in`);
+  startApp();
+}
+async function loadProfile(authId){
+  const { data } = await sb.from('users').select('*').eq('auth_id',authId).maybeSingle();
+  return data || null;
+}
+async function logout(){ try{ if(me) await audit('auth.logout','user',me.id,`${me.name} ${me.surname} signed out`); }catch(e){} try{ await sb.auth.signOut(); }catch(e){} location.reload(); }
+
+async function startApp(){
+  $('#loginScreen').style.display='none'; $('#registerScreen').style.display='none'; $('#app').style.display='block';
+  $('#meName').textContent=`${me.name} ${me.surname}`; $('#meEmail').textContent=me.email; $('#meBadge').textContent=me.role||'Employee';
+  activeTab = (me.role==='Manager'||me.role==='Director') ? 'approve' : (me.role==='HR' ? 'hr' : (me.role==='Finance' ? 'export' : (me.role==='IT Administrator' ? 'admin' : 'claims')));
+  await loadAll();
+  $('#f-date').valueAsDate=new Date();
+  buildTabs();
+  await loadNotifications();
+  if(myNotifs.length) showNotifications();
+  refreshFinanceBanner();
+  startIdleTimer();
+}
+function refreshFinanceBanner(){
+  const b=$('#notifBanner'); if(!b) return;
+  if(me && me.role==='Finance'){
+    const pend=allCentres.filter(c=>c.from_account && (c.account_status||'').toLowerCase()!=='approved' && (c.account_status||'').toLowerCase()!=='rejected').length;
+    if(pend){ b.style.display='block'; b.textContent=`🔔 ${pend} company paying account${pend===1?'':'s'} need your approval — go to Payments.`; b.onclick=()=>{ activeTab='export'; buildTabs(); }; return; }
+  }
+  // no pending Finance approvals — hide the banner unless employee notifications are using it
+  if(!myNotifs || !myNotifs.length){ b.style.display='none'; }
+}
+
+// ===== auto-logout after 5 minutes of inactivity =====
+const IDLE_MS = 5*60*1000;
+let idleTimer=null;
+function resetIdle(){ if(!me) return; clearTimeout(idleTimer); idleTimer=setTimeout(idleLogout, IDLE_MS); }
+async function idleLogout(){ if(!me) return;
+  try{ await audit('auth.logout','user',me.id,`${me.name} ${me.surname} signed out (inactivity timeout)`); }catch(e){}
+  try{ sessionStorage.setItem('claimflow_idle','1'); }catch(e){}
+  try{ await sb.auth.signOut(); }catch(e){}
+  location.reload();
+}
+function startIdleTimer(){
+  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(ev=>document.addEventListener(ev, resetIdle, {passive:true}));
+  resetIdle();
+}
+
+async function loadAll(){
+  setStatus('<span class="spinner"></span>Loading…','info');
+  const tasks=[
+    sb.from('users').select('id, name, surname, role, manager_id, status'),
+    sb.from('approval_authority').select('profit_center, manager_id'),
+    sb.from('batches').select('*').order('created_date',{ascending:false}),
+    sb.from('transactions').select('*').eq('employee_id', me.id).order('created_date',{ascending:false})
+  ];
+  const [{data:users,error:ue},{data:auth},{data:batches,error:be},{data:txns,error:te}] = await Promise.all(tasks);
+  if(ue||be||te){ setStatus('<b>Could not load data.</b><br>'+explain(ue||be||te),'err'); return; }
+  userMap={}; (users||[]).forEach(u=>userMap[u.id]=u);
+  authorityMap={}; (auth||[]).forEach(a=>{ (authorityMap[a.profit_center]=authorityMap[a.profit_center]||[]).push(a.manager_id); });
+  allBatches=batches||[]; myBatches=allBatches.filter(b=>b.employee_id===me.id); myTxns=txns||[];
+  myDocs={}; const txnIds=myTxns.map(t=>t.id);
+  if(txnIds.length){ const { data:docs } = await sb.from('documents').select('*').in('transaction_id', txnIds);
+    (docs||[]).forEach(d=>{ myDocs[d.transaction_id]=d; }); }
+  // profit centres — from the master list (Configuration); fall back to legacy derivation if the table isn't there yet
+  const { data:pcs } = await sb.from('profit_centres').select('*').order('code',{ascending:true});
+  allCentres = pcs || [];
+  if(allCentres.length){ profitCentres = allCentres.filter(c=>(c.status||'active')==='active').map(c=>c.code); }
+  else { profitCentres = Object.keys(authorityMap).sort(); if(profitCentres.length===0) profitCentres=['PC001','PC002','PC003']; }
+  $('#f-pc').innerHTML='<option value="">Select…</option>'+profitCentres.map(p=>`<option value="${p}">${p}</option>`).join('');
+  $('#e-pc').innerHTML=profitCentres.map(p=>`<option value="${p}">${p}</option>`).join('');
+  if(me.role==='HR'){ const { count } = await sb.from('users').select('id',{count:'exact',head:true}).eq('status','pending'); hrPendingCount=count||0; }
+  const { data:rates } = await sb.from('mileage_rates').select('*').order('effective_date',{ascending:false});
+  mileageRates = rates || [];
+  const { data:cfg } = await sb.from('app_config').select('*');
+  appConfig = {}; (cfg||[]).forEach(r=>{ appConfig[r.key]=r.value; });
+  const { data:deacts } = await sb.from('deactivation_requests').select('*').order('id',{ascending:false});
+  deactRequests = deacts || [];
+  const { data:advs } = await sb.from('petty_cash_advances').select('*').order('id',{ascending:false});
+  allAdvances = advs || [];
+  myAdvances = allAdvances.filter(a=>a.employee_id===me.id);
+  setStatus('');
+}
+async function refresh(){ await loadAll(); buildTabs(); }
+
+function buildTabs(){
+  const tabs=[{id:'new',label:'New claim'},{id:'claims',label:'My claims'}];
+  if(me.role==='Manager'||me.role==='Director') tabs.push({id:'dashboard',label:'Dashboard'});
+  if(me.role==='Manager'||me.role==='Director') tabs.push({id:'approve',label:'To approve', pill:batchesForQueue().length});
+  if(me.role==='Manager') tabs.push({id:'centres',label:'My centres'});
+  if(me.role==='Director') tabs.push({id:'oversight',label:'Oversight'});
+  const myReports = Object.values(userMap).filter(u=>String(u.manager_id)===String(me.id) && (u.status||'').toLowerCase()==='approved');
+  if(myReports.length) tabs.push({id:'team',label:'My team'});
+  tabs.push({id:'petty',label:'My petty cash', pill:myAdvances.filter(a=>(a.status||'')==='issued').length});
+  if(me.role==='Manager') tabs.push({id:'pettyteam',label:'Team petty cash'});
+  if(me.role==='Finance'||me.role==='Director'){ const reqs=allAdvances.filter(a=>(a.status||'')==='requested').length;
+    tabs.push({id:'pettyfin',label:'Petty cash', pill:reqs}); }
+  if(me.role==='HR') tabs.push({id:'hr',label:'Registrations', pill:hrPendingCount});
+  if(me.role==='Finance'){ const pendAcct=allCentres.filter(c=>c.from_account && (c.account_status||'').toLowerCase()!=='approved' && (c.account_status||'').toLowerCase()!=='rejected').length;
+    tabs.push({id:'export',label:'Payments', pill: (allBatches.filter(b=>(b.status||'').toLowerCase()==='approved').length) + pendAcct}); }
+  if(me.role==='Director'||me.role==='Finance') tabs.push({id:'audit',label:'Audit log'});
+  if(me.role==='Director'||me.role==='Finance') tabs.push({id:'reports',label:'Reports'});
+  if(me.role==='IT Administrator') tabs.push({id:'admin',label:'Configuration'});
+  if(!tabs.some(t=>t.id===activeTab)) activeTab=tabs[0].id;
+  const box=$('#tabs'); box.innerHTML='';
+  tabs.forEach(t=>{ const b=document.createElement('button'); b.innerHTML=t.label+(t.pill?`<span class="pill">${t.pill}</span>`:'');
+    if(t.id===activeTab) b.className='active'; b.onclick=()=>{ if(t.id==='new') captureFunding='own'; activeTab=t.id; buildTabs(); }; box.appendChild(b); });
+  showView();
+}
+function showView(){
+  $('#view-new').style.display    = activeTab==='new'?'block':'none';
+  $('#view-claims').style.display = activeTab==='claims'?'block':'none';
+  $('#view-batches').style.display= ['approve','centres','oversight'].includes(activeTab)?'block':'none';
+  $('#view-hr').style.display     = activeTab==='hr'?'block':'none';
+  $('#view-export').style.display = activeTab==='export'?'block':'none';
+  $('#view-audit').style.display  = activeTab==='audit'?'block':'none';
+  $('#view-admin').style.display  = activeTab==='admin'?'block':'none';
+  $('#view-team').style.display   = activeTab==='team'?'block':'none';
+  $('#view-reports').style.display= activeTab==='reports'?'block':'none';
+  $('#view-dashboard').style.display = activeTab==='dashboard'?'block':'none';
+  $('#view-petty').style.display   = activeTab==='petty'?'block':'none';
+  $('#view-pettyfin').style.display= activeTab==='pettyfin'?'block':'none';
+  $('#view-pettyteam').style.display= activeTab==='pettyteam'?'block':'none';
+  if(activeTab==='claims') renderClaims();
+  if(['approve','centres','oversight'].includes(activeTab)) renderBatches();
+  if(activeTab==='hr') renderHR();
+  if(activeTab==='export') renderExport();
+  if(activeTab==='audit') renderAudit();
+  if(activeTab==='admin') renderAdmin();
+  if(activeTab==='team') renderTeam();
+  if(activeTab==='reports') renderReports();
+  if(activeTab==='dashboard') renderDashboard();
+  if(activeTab==='petty') renderPetty();
+  if(activeTab==='pettyfin') renderPettyFinance();
+  if(activeTab==='pettyteam') renderPettyTeam();
+  if(activeTab==='new') renderFundingBanner();
+}
+async function renderFundingBanner(){
+  const el=$('#fundingBanner'); if(!el) return;
+  if(captureFunding!=='float'){ el.style.display='none'; el.innerHTML=''; $('#saveDraftBtn').textContent='Save as draft'; return; }
+  const open=myAdvances.filter(a=>(a.status||'')==='confirmed');
+  el.style.display='block';
+  if(!open.length){
+    el.innerHTML=`<div class="note" style="background:#fdecec;border:1px solid #f5c2c2;border-radius:10px;padding:12px 14px;margin-bottom:16px">
+      <b>No open advance to account against.</b> Confirm an advance first, then capture what you spend from it.
+      <a class="rc-link" id="switchToOwn" style="display:inline-block;margin-top:6px">I paid for this myself instead</a></div>`;
+    $('#saveDraftBtn').textContent='Save as draft (petty cash)';
+    const s=$('#switchToOwn'); if(s) s.onclick=(e)=>{ e.preventDefault(); captureFunding='own'; captureAdvanceId=null; renderFundingBanner(); };
+    return;
+  }
+  if(!captureAdvanceId || !open.some(a=>a.id===captureAdvanceId)) captureAdvanceId=open[0].id;
+  const opts=open.map(a=>`<option value="${a.id}"${a.id===captureAdvanceId?' selected':''}>${money(a.amount)} — ${a.reason||'advance #'+a.id}</option>`).join('');
+  el.innerHTML=`<div class="note" style="background:var(--accent-soft);border:1px solid #cfe3e0;border-radius:10px;padding:12px 14px;margin-bottom:16px">
+    <b>Paid from your petty cash.</b> You will not be reimbursed — this is accounted against a specific advance.
+    <div style="margin-top:8px">Account against:
+      <select id="pcAdvPick" style="margin-left:6px;padding:5px 8px;border:1px solid var(--line);border-radius:8px">${opts}</select></div>
+    <a class="rc-link" id="switchToOwn" style="display:inline-block;margin-top:8px">No — I paid for this myself</a>
+  </div>`;
+  $('#saveDraftBtn').textContent='Save as draft (petty cash)';
+  const pick=$('#pcAdvPick'); if(pick) pick.onchange=()=>{ captureAdvanceId=Number(pick.value); };
+  const s=$('#switchToOwn'); if(s) s.onclick=(e)=>{ e.preventDefault(); captureFunding='own'; captureAdvanceId=null; renderFundingBanner(); };
+}
+
+// ===== employee side =====
+async function saveDraft(){
+  const category=$('#f-category').value, pc=$('#f-pc').value,
+        date=$('#f-date').value, vendor=$('#f-vendor').value.trim(), notes=$('#f-notes').value.trim();
+  const msg=$('#formMsg'); msg.className='formmsg';
+  if(!category||!pc||!date||!vendor){ msg.className='formmsg err'; msg.textContent='Please fill in category, profit centre, date and vendor.'; return; }
+  let amount, description=notes;
+  if(category==='mileage'){
+    const km=parseFloat($('#f-km').value), r=rateForDate(date);
+    if(!r){ msg.className='formmsg err'; msg.textContent='No mileage rate is set for this date — contact Finance.'; return; }
+    if(!km||km<=0){ msg.className='formmsg err'; msg.textContent='Enter the kilometres travelled.'; return; }
+    amount=Math.round(km*Number(r.rate_amount)*100)/100;
+    description=(notes?notes+' · ':'')+`${km} km × ${money(r.rate_amount)}/km`;
+  } else {
+    amount=parseFloat($('#f-amount').value);
+    if(!amount){ msg.className='formmsg err'; msg.textContent='Please enter an amount.'; return; }
+  }
+  // duplicate detection — warn the employee, never block
+  const warns = await dupCheckCapture(category, amount, vendor, date, pc);
+  if(warns.length){ if(!confirm('This looks like a possible duplicate — '+warns.join('; ')+'.\n\nAre you sure you want to save it?')){ return; } }
+  if(captureFunding==='float' && !captureAdvanceId){ msg.className='formmsg err'; msg.textContent='Choose which advance this petty cash expense is accounted against.'; return; }
+  $('#saveDraftBtn').disabled=true;
+  const { data:created, error } = await sb.from('transactions')
+    .insert({ employee_id:me.id, category, amount, claim_date:date, vendor, description, profit_center:pc, status:'draft', funding_source:captureFunding, advance_id: captureFunding==='float'?captureAdvanceId:null, created_date:new Date().toISOString() })
+    .select().single();
+  if(error){ $('#saveDraftBtn').disabled=false; msg.className='formmsg err'; msg.textContent='Could not save: '+explain(error); return; }
+  await audit('claim.create','transaction',created&&created.id,`Captured claim: ${vendor} · ${money(amount)} · ${category} · ${pc}${captureFunding==='float'?' · paid from petty cash':''}`);
+  if(warns.length) await audit('claim.flag','transaction',created&&created.id,`Possible duplicate flagged at capture: ${warns.join('; ')}`,{warnings:warns});
+  // if a receipt was attached on the form, upload it to the new claim
+  if(pendingReceipt && created){
+    const up = await putReceiptFile(pendingReceipt, created.id);
+    if(!up.ok){ msg.className='formmsg err'; msg.textContent='Claim saved, but the receipt failed: '+up.error+'. You can add it from My claims.'; }
+    else if(up.dupReceipt){ await audit('claim.flag','transaction',created.id,`Duplicate receipt: same receipt already on claim #${up.dupReceipt}`,{dupOf:up.dupReceipt}); toast(`⚠ That receipt is already on claim #${up.dupReceipt}`); }
+  }
+  $('#saveDraftBtn').disabled=false;
+  msg.className='formmsg ok'; if(!msg.textContent||msg.classList.contains('ok')) msg.textContent = pendingReceipt ? 'Saved as draft with receipt.' : 'Saved as draft.';
+  ['f-category','f-amount','f-km','f-pc','f-vendor','f-notes'].forEach(id=>$('#'+id).value=''); $('#f-date').valueAsDate=new Date();
+  onCategoryChange(); clearFormReceipt();
+  await refresh(); setTimeout(()=>{ msg.textContent=''; },2800);
+}
+
+// ===== mileage =====
+// returns the rate row effective on the given claim date (latest effective_date on or before it), or null
+function rateForDate(dateStr){
+  if(!dateStr) return null;
+  for(const r of mileageRates){ if((r.status||'active').toLowerCase()!=='active') continue; if(String(r.effective_date) <= dateStr) return r; }
+  return null;
+}
+function onCategoryChange(){
+  const isMileage = $('#f-category').value==='mileage';
+  $('#f-amount-wrap').style.display = isMileage ? 'none' : 'block';
+  $('#f-km-wrap').style.display     = isMileage ? 'block' : 'none';
+  $('#f-mileage-calc').style.display= isMileage ? 'block' : 'none';
+  if(isMileage) recalcMileage();
+}
+function recalcMileage(){
+  const calc=$('#f-mileage-calc'); if($('#f-category').value!=='mileage'){ calc.style.display='none'; return; }
+  calc.style.display='block';
+  const date=$('#f-date').value, km=parseFloat($('#f-km').value), r=rateForDate(date);
+  if(!r){ calc.style.color='var(--reject)'; calc.textContent='No mileage rate is set for this date — contact Finance.'; $('#f-amount').value=''; return; }
+  if(!km||km<=0){ calc.style.color='var(--muted)'; calc.textContent=`Rate on ${fmtDate(date)}: ${money(r.rate_amount)}/km. Enter kilometres to calculate.`; $('#f-amount').value=''; return; }
+  const amt=Math.round(km*Number(r.rate_amount)*100)/100;
+  $('#f-amount').value=amt;
+  calc.style.color='var(--muted)'; calc.innerHTML=`${km} km × ${money(r.rate_amount)} = <b style="color:var(--ink)">${money(amt)}</b>`;
+}
+
+function batchOf(txId){ return myBatches.filter(b=>Array.isArray(b.transaction_ids)&&b.transaction_ids.includes(txId)).sort((a,b)=>new Date(b.created_date)-new Date(a.created_date))[0]||null; }
+function rejectedBatchFor(txId){ return myBatches.filter(b=>Array.isArray(b.transaction_ids)&&b.transaction_ids.includes(txId)&&(b.status||'').toLowerCase()==='rejected').sort((a,b)=>new Date(b.created_date)-new Date(a.created_date))[0]||null; }
+function stageOf(tx){ const s=(tx.status||'').toLowerCase();
+  if(s==='draft') return {label:'Draft', cls:'draft', editable:true};
+  if(s==='pending_approval') return {label:'Submitted', cls:'pending', editable:false, hint:'Awaiting the Thursday auto-batch.'};
+  const b=batchOf(tx.id);
+  if(b){ const bs=(b.status||'').toLowerCase();
+    if(bs==='pending') return {label:'Awaiting approval', cls:'pending', editable:false};
+    if(bs==='approved') return {label:'Approved', cls:'approved', editable:false};
+    if(bs==='rejected') return {label:'Rejected', cls:'rejected', editable:false, batch:b};
+    if(bs==='exported') return {label:'Sent for payment', cls:'neutral', editable:false};
+    if(bs==='reconciled') return {label:'Payment successful', cls:'approved', editable:false};
+    return {label:b.status||'In batch', cls:'neutral', editable:false}; }
+  if(s==='batched') return {label:'Awaiting approval', cls:'pending', editable:false};
+  if(s==='approved') return {label:'Approved', cls:'approved', editable:false};
+  return {label:tx.status||'Unknown', cls:'neutral', editable:false}; }
+
+function renderClaims(){
+  const order=['Draft','Submitted','Awaiting approval','Approved','Sent for payment','Payment successful','Rejected'];
+  const present=[...new Set(myTxns.map(t=>stageOf(t).label))].sort((a,b)=>{ const ia=order.indexOf(a),ib=order.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  const opts=['All',...present]; if(!opts.includes(claimFilter)) claimFilter='All';
+  const fbox=$('#claimsFilter'); fbox.innerHTML='';
+  opts.forEach(s=>{ const b=document.createElement('button'); b.textContent=s; if(s===claimFilter) b.className='active'; b.onclick=()=>{ claimFilter=s; renderClaims(); }; fbox.appendChild(b); });
+  const rows=myTxns.filter(t=>claimFilter==='All'||stageOf(t).label===claimFilter);
+  $('#claimsCount').textContent=rows.length+(rows.length===1?' claim':' claims');
+  const list=$('#claimsList');
+  if(rows.length===0){ list.innerHTML='<div class="empty"><h3>No claims here</h3><p>Create one from the “New claim” tab.</p></div>'; return; }
+  list.innerHTML='';
+  rows.forEach(tx=>{ const st=stageOf(tx); const card=document.createElement('div'); card.className='claim';
+    let inner=`<div class="claim-top"><div><div class="vendor">${tx.vendor||'—'}</div>
+      <div class="meta">${(tx.category||'—')} · ${tx.profit_center||'no centre'} · ${fmtDate(tx.claim_date)}</div></div>
+      <div class="amount num">${money(tx.amount)}</div><span class="chip ${st.cls}">${st.label}</span></div>`;
+    if(st.hint) inner+=`<div class="note">${st.hint}</div>`;
+    inner += receiptSection(tx, st.editable);
+    if(st.editable){ const rb=rejectedBatchFor(tx.id);
+      if(rb&&rb.rejection_remarks) inner+=`<div class="rejected-note">Returned by ${nameOf(rb.approved_by_manager_id)}: ${rb.rejection_remarks}</div>`;
+      inner+=`<div class="claim-actions"><button class="btn-sm btn-edit" data-edit="${tx.id}">Edit</button>
+        <button class="btn-sm btn-submit2" data-submit="${tx.id}">Submit for approval</button>
+        <button class="btn-sm btn-del" data-del="${tx.id}">Delete</button></div>`;
+    } else if(st.batch&&(st.batch.status||'').toLowerCase()==='rejected'&&st.batch.rejection_remarks){
+      inner+=`<div class="rejected-note">Manager's reason: ${st.batch.rejection_remarks}</div>`;
+    }
+    card.innerHTML=inner; list.appendChild(card); });
+  list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEdit(Number(b.dataset.edit)));
+  list.querySelectorAll('[data-submit]').forEach(b=>b.onclick=()=>submitForApproval(Number(b.dataset.submit)));
+  list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteDraft(Number(b.dataset.del)));
+  wireReceipts();
+}
+
+// ===== receipts (Step 1: attach + view, per line) =====
+// New-claim form receipt: held in memory, uploaded when the claim is saved
+function setFormReceipt(file){
+  if(!file) return;
+  const okType = file.type.startsWith('image/') || file.type==='application/pdf';
+  if(!okType){ toast('Please attach an image or a PDF.'); return; }
+  if(file.size > 5*1024*1024){ toast('That file is too large (5MB max).'); return; }
+  pendingReceipt=file;
+  $('#f-dropText').innerHTML=`📎 ${file.name} attached — <a class="rc-link" id="f-clear">remove</a>`;
+  $('#f-clear').onclick=e=>{ e.preventDefault(); clearFormReceipt(); };
+}
+function clearFormReceipt(){
+  pendingReceipt=null;
+  const t=$('#f-dropText'); if(t){ t.innerHTML=`<a class="rc-link" id="f-choose">Take a photo or attach a receipt</a>`; $('#f-choose').onclick=()=>{ uploadTxn='form'; $('#rcInput').value=''; $('#rcInput').click(); }; }
+}
+function receiptSection(tx, editable){
+  const doc=myDocs[tx.id];
+  if(doc){
+    let h=`<div class="rc"><span class="rc-file">📎 Receipt attached</span> · <a class="receipt" href="${doc.file_url}" target="_blank" rel="noopener">View</a>`;
+    if(editable) h+=` · <a class="rc-link" data-replace="${tx.id}">Replace</a> · <a class="rc-link rc-del" data-rcdel="${tx.id}">Remove</a>`;
+    return h+`</div>`;
+  }
+  if(tx.no_receipt_reason){
+    let h=`<div class="rc"><span class="noreceipt">No receipt — ${tx.no_receipt_reason}</span>`;
+    if(editable) h+=` · <a class="rc-link" data-choose="${tx.id}">Attach a receipt instead</a>`;
+    return h+`</div>`;
+  }
+  if(editable){
+    return `<div class="dropzone" data-drop="${tx.id}">
+      <div class="dz-text">Drag a receipt here, or <a class="rc-link" data-choose="${tx.id}">choose a file / take a photo</a></div>
+      <div class="dz-sub">Images or PDF, up to 5MB · or <a class="rc-link" data-noreceipt="${tx.id}">no receipt available</a></div>
+    </div>`;
+  }
+  return `<div class="rc"><span class="noreceipt">No receipt attached</span></div>`;
+}
+function wireReceipts(){
+  document.querySelectorAll('[data-choose]').forEach(a=>a.onclick=()=>{ uploadTxn=Number(a.dataset.choose); $('#rcInput').value=''; $('#rcInput').click(); });
+  document.querySelectorAll('[data-replace]').forEach(a=>a.onclick=()=>{ uploadTxn=Number(a.dataset.replace); $('#rcInput').value=''; $('#rcInput').click(); });
+  document.querySelectorAll('[data-rcdel]').forEach(a=>a.onclick=()=>removeReceipt(Number(a.dataset.rcdel)));
+  document.querySelectorAll('[data-noreceipt]').forEach(a=>a.onclick=()=>setNoReceipt(Number(a.dataset.noreceipt)));
+  document.querySelectorAll('[data-drop]').forEach(z=>{
+    const id=Number(z.dataset.drop);
+    z.addEventListener('dragover',e=>{ e.preventDefault(); z.classList.add('drag'); });
+    z.addEventListener('dragleave',()=>z.classList.remove('drag'));
+    z.addEventListener('drop',e=>{ e.preventDefault(); z.classList.remove('drag'); if(e.dataTransfer.files&&e.dataTransfer.files[0]) uploadReceipt(e.dataTransfer.files[0], id); });
+  });
+}
+// core upload helper — validates, stores in the receipts bucket, links a documents row. Returns {ok, error}.
+async function sha256Bytes(buf){ const h=await crypto.subtle.digest('SHA-256', buf); return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
+// ===== duplicate / fraud-pattern detection (flags, never blocks) =====
+function dupFloor(){ return Number((appConfig && appConfig.duplicate_floor) || 100); }
+function vendorNorm(v){ return (v||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
+// conservative fuzzy: one contains the other (len>=3), or differ by at most 1-2 chars
+function vendorSimilar(a,b){ a=vendorNorm(a); b=vendorNorm(b); if(!a||!b) return false; if(a===b) return true;
+  if(a.length>=3 && b.length>=3 && (a.includes(b)||b.includes(a))) return true;
+  if(Math.abs(a.length-b.length)<=2 && leven(a,b)<=2 && Math.min(a.length,b.length)>=4) return true; return false; }
+function vendorExact(a,b){ return vendorNorm(a)===vendorNorm(b); }
+function leven(a,b){ const m=a.length,n=b.length; const d=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]); for(let j=0;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){ d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); } return d[m][n]; }
+
+// capture-time: only LOUD signals warn the employee ("are you sure?")
+async function dupCheckCapture(category, amount, vendor, date, pc){
+  const warns=[]; const floor=dupFloor();
+  try{
+    // duplicate receipt is handled at receipt-attach time (always loud)
+    // LOUD: same-person exact match (amount+vendor+date) above the floor
+    if(category!=='mileage' && Number(amount)>=floor){
+      const { data:mine } = await sb.from('transactions').select('id,vendor').eq('employee_id',me.id).eq('claim_date',date).eq('amount',amount);
+      const hit=(mine||[]).find(o=>vendorExact(o.vendor,vendor));
+      if(hit) warns.push(`you already have a claim for the same amount, vendor and date (claim #${hit.id})`);
+    }
+    // LOUD: same-day mileage on another profit centre
+    if(category==='mileage'){
+      const { data:om } = await sb.from('transactions').select('id,profit_center').eq('employee_id',me.id).eq('category','mileage').eq('claim_date',date);
+      const diff=(om||[]).filter(o=>o.profit_center && o.profit_center!==pc);
+      if(diff.length) warns.push(`you're already claiming mileage on ${[...new Set(diff.map(o=>o.profit_center))].join(', ')} on this date`);
+    }
+  }catch(e){ /* best-effort */ }
+  return warns;
+}
+
+// approver-side: shows ALL signals (loud + quiet), tagged by strength
+async function findDuplicates(txns, docMap){
+  const flags={}; const add=(id,m)=>{ (flags[id]=flags[id]||[]).push(m); };
+  const floor=dupFloor();
+  try{
+    const dates=[...new Set(txns.map(t=>t.claim_date))];
+    if(dates.length){ const { data:cand } = await sb.from('transactions').select('id,employee_id,amount,vendor,claim_date,category').in('claim_date',dates);
+      (cand||[]).forEach(c=>{ txns.forEach(t=>{
+        if(c.id===t.id || c.claim_date!==t.claim_date) return;
+        if((t.category||'')==='mileage' || (c.category||'')==='mileage') return;
+        if(Number(c.amount)!==Number(t.amount)) return;
+        if(Number(t.amount)<floor) return;                       // below floor → ignore
+        const samePerson = c.employee_id===t.employee_id;
+        if(vendorExact(c.vendor,t.vendor)){
+          add(t.id, samePerson
+            ? `⚠ Likely duplicate — same employee, same amount, vendor and date as claim #${c.id}`
+            : `Possible duplicate — same amount, vendor and date as claim #${c.id} (${nameOf(c.employee_id)})`);
+        } else if(vendorSimilar(c.vendor,t.vendor)){
+          add(t.id, `Possible duplicate — same amount and date, similar vendor ("${c.vendor}") on claim #${c.id} (${nameOf(c.employee_id)})`);
+        }
+      }); }); }
+    // duplicate receipt (same file fingerprint) — always flag, any amount
+    const hashes=txns.map(t=>docMap[t.id]&&docMap[t.id].file_hash).filter(Boolean);
+    if(hashes.length){ const { data:dd } = await sb.rpc('receipt_dupes',{ p_hashes:hashes });
+      (dd||[]).forEach(d=>{ txns.forEach(t=>{ const td=docMap[t.id]; if(td && td.file_hash && td.file_hash===d.file_hash && d.transaction_id!==t.id){ add(t.id,`⚠ Duplicate receipt — the same receipt file is on claim #${d.transaction_id}`); } }); }); }
+    // same-day mileage across >1 centre
+    for(const t of txns.filter(x=>(x.category||'')==='mileage')){
+      const { data:other } = await sb.from('transactions').select('id,profit_center').eq('employee_id',t.employee_id).eq('category','mileage').eq('claim_date',t.claim_date).neq('id',t.id);
+      const diff=(other||[]).filter(o=>o.profit_center!==t.profit_center);
+      if(diff.length) add(t.id,`⚠ Same-day mileage on another centre — also on ${[...new Set(diff.map(o=>o.profit_center))].join(', ')} this date`);
+    }
+  }catch(e){ /* best-effort */ }
+  Object.keys(flags).forEach(k=>flags[k]=[...new Set(flags[k])]);
+  return flags;
+}
+async function putReceiptFile(file, txnId){
+  if(!file||!txnId) return {ok:false, error:'no file'};
+  const okType = file.type.startsWith('image/') || file.type==='application/pdf';
+  if(!okType) return {ok:false, error:'not an image or PDF'};
+  if(file.size > 5*1024*1024) return {ok:false, error:'file too large (5MB max)'};
+  // fingerprint the file for duplicate-receipt detection
+  let fhash=null, dupReceipt=null;
+  try{ fhash = await sha256Bytes(await file.arrayBuffer());
+    const { data:dupId } = await sb.rpc('receipt_duplicate_of',{ p_hash:fhash, p_txn_id:txnId });
+    if(dupId) dupReceipt = dupId;
+  }catch(e){ /* hashing best-effort */ }
+  const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path=`${txnId}/${Date.now()}-${safe}`;
+  const { error:ue } = await sb.storage.from('receipts').upload(path, file, { contentType:file.type, upsert:false });
+  if(ue) return {ok:false, error:explain(ue)};
+  const { data:pub } = sb.storage.from('receipts').getPublicUrl(path);
+  const existing=myDocs[txnId];
+  if(existing){ await sb.from('documents').delete().eq('id', existing.id);
+    const oldPath=(existing.file_url||'').split('/receipts/')[1]; if(oldPath) await sb.storage.from('receipts').remove([oldPath]); }
+  const { error:de } = await sb.from('documents').insert({ transaction_id:txnId, file_url:pub.publicUrl, file_type:file.type, upload_date:new Date().toISOString(), file_hash:fhash });
+  if(de) return {ok:false, error:explain(de)};
+  await sb.from('transactions').update({ no_receipt_reason:null }).eq('id',txnId);
+  return {ok:true, dupReceipt};
+}
+async function uploadReceipt(file, txnId){
+  const okType = file && (file.type.startsWith('image/') || file.type==='application/pdf');
+  if(!okType){ toast('Please attach an image or a PDF.'); return; }
+  if(file.size > 5*1024*1024){ toast('That file is too large (5MB max).'); return; }
+  toast('Uploading receipt…');
+  const r = await putReceiptFile(file, txnId);
+  if(!r.ok){ toast('Upload failed: '+r.error); return; }
+  if(r.dupReceipt){ toast(`⚠ Heads up — this receipt is already on claim #${r.dupReceipt}`); await audit('claim.flag','transaction',txnId,`Duplicate receipt: same receipt already on claim #${r.dupReceipt}`,{dupOf:r.dupReceipt}); }
+  else toast('Receipt attached');
+  await refresh();
+}
+async function removeReceipt(txnId){
+  if(!confirm('Remove this receipt?')) return;
+  const doc=myDocs[txnId]; if(!doc) return;
+  await sb.from('documents').delete().eq('id', doc.id);
+  const oldPath=(doc.file_url||'').split('/receipts/')[1]; if(oldPath) await sb.storage.from('receipts').remove([oldPath]);
+  toast('Receipt removed'); await refresh();
+}
+async function setNoReceipt(txnId){
+  const reason=prompt('Why is there no receipt for this claim? (your approver will see this)');
+  if(reason===null||!reason.trim()) return;
+  const { error } = await sb.from('transactions').update({ no_receipt_reason:reason.trim() }).eq('id',txnId);
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  toast('Saved'); await refresh();
+}
+function stripMileageNote(desc){ return (desc||'').replace(/\s*·?\s*[\d.]+\s*km\s*×.*?\/km\s*$/i,'').trim(); }
+function openEdit(id){ const tx=myTxns.find(t=>t.id===id); if(!tx) return; editingId=id;
+  $('#e-category').value=tx.category||'other'; $('#e-amount').value=tx.amount; $('#e-pc').value=tx.profit_center||profitCentres[0];
+  $('#e-date').value=tx.claim_date; $('#e-vendor').value=tx.vendor||''; $('#e-notes').value=tx.description||'';
+  if((tx.category||'')==='mileage'){
+    const r=rateForDate(tx.claim_date);
+    $('#e-km').value = (r && Number(r.rate_amount)>0) ? Math.round((Number(tx.amount)/Number(r.rate_amount))*10)/10 : '';
+    $('#e-notes').value = stripMileageNote(tx.description||'');
+  } else { $('#e-km').value=''; }
+  onEditCategoryChange();
+  $('#editModal').classList.add('open'); }
+function closeEdit(){ $('#editModal').classList.remove('open'); editingId=null; }
+function onEditCategoryChange(){
+  const isMileage = $('#e-category').value==='mileage';
+  $('#e-amount-wrap').style.display = isMileage ? 'none' : 'block';
+  $('#e-km-wrap').style.display     = isMileage ? 'block' : 'none';
+  $('#e-mileage-calc').style.display= isMileage ? 'block' : 'none';
+  if(isMileage) recalcEditMileage();
+}
+function recalcEditMileage(){
+  const calc=$('#e-mileage-calc'); if($('#e-category').value!=='mileage'){ calc.style.display='none'; return; }
+  calc.style.display='block';
+  const date=$('#e-date').value, km=parseFloat($('#e-km').value), r=rateForDate(date);
+  if(!r){ calc.style.color='var(--reject)'; calc.textContent='No mileage rate is set for this date — contact Finance.'; $('#e-amount').value=''; return; }
+  if(!km||km<=0){ calc.style.color='var(--muted)'; calc.textContent=`Rate on ${fmtDate(date)}: ${money(r.rate_amount)}/km. Enter kilometres to calculate.`; $('#e-amount').value=''; return; }
+  const amt=Math.round(km*Number(r.rate_amount)*100)/100;
+  $('#e-amount').value=amt;
+  calc.style.color='var(--muted)'; calc.innerHTML=`${km} km × ${money(r.rate_amount)} = <b style="color:var(--ink)">${money(amt)}</b>`;
+}
+async function saveEdit(){ if(!editingId) return;
+  const category=$('#e-category').value, pc=$('#e-pc').value, date=$('#e-date').value, vendor=$('#e-vendor').value.trim(), notes=$('#e-notes').value.trim();
+  if(!category||!pc||!date||!vendor){ toast('Fill in category, profit centre, date and vendor.'); return; }
+  let amount, description=notes;
+  if(category==='mileage'){
+    const km=parseFloat($('#e-km').value), r=rateForDate(date);
+    if(!r){ toast('No mileage rate is set for this date — contact Finance.'); return; }
+    if(!km||km<=0){ toast('Enter the kilometres travelled.'); return; }
+    amount=Math.round(km*Number(r.rate_amount)*100)/100;
+    description=(notes?notes+' · ':'')+`${km} km × ${money(r.rate_amount)}/km`;
+  } else {
+    amount=parseFloat($('#e-amount').value);
+    if(!amount){ toast('Enter an amount.'); return; }
+  }
+  const upd={ category, amount, profit_center:pc, claim_date:date, vendor, description, last_edited_date:new Date().toISOString() };
+  const { error } = await sb.from('transactions').update(upd).eq('id',editingId).eq('status','draft');
+  if(error){ toast('Could not save: '+explain(error)); return; } await audit('claim.edit','transaction',editingId,`Edited draft claim #${editingId} · ${vendor} · ${money(amount)}`); toast('Claim updated'); closeEdit(); await refresh(); }
+async function submitForApproval(id){
+  const tx=myTxns.find(t=>t.id===id);
+  if(tx && !myDocs[id] && !tx.no_receipt_reason){ toast('Attach a receipt first, or mark “no receipt available” with a reason.'); return; }
+  if(!confirm('Submit this claim for approval? Once submitted you can no longer edit it or change its receipt. It will be auto-batched on Thursday.')) return;
+  const { data:updated, error } = await sb.from('transactions').update({status:'pending_approval'}).eq('id',id).eq('status','draft').select();
+  if(error){ toast('Could not submit: '+explain(error)); return; } if(!updated||updated.length===0) toast('That claim is no longer a draft.'); else { await audit('claim.submit','transaction',id,`Submitted claim #${id} for approval`); toast('Submitted for approval'); } closeEdit(); await refresh(); }
+async function deleteDraft(id){ if(!confirm('Delete this draft? This cannot be undone.')) return;
+  const { error } = await sb.from('transactions').delete().eq('id',id).eq('status','draft'); if(error){ toast('Could not delete: '+explain(error)); return; } await audit('claim.delete','transaction',id,`Deleted draft claim #${id}`); toast('Draft deleted'); await refresh(); }
+
+// ===== approval side =====
+function batchesForQueue(){ return allBatches.filter(canIActOn); }
+function batchesMyCentres(){ const pcs=myCentres(); return allBatches.filter(b=>pcs.includes(b.profit_center)); }
+function batchesOversight(){ return allBatches; }
+function renderBatches(){ const hint=$('#batchesHint'); let rows=[];
+  if(activeTab==='approve'){ rows=batchesForQueue(); hint.textContent= me.role==='Director'?'Batches submitted by managers (and your own, self-approved) waiting on your decision.':'Batches from your team waiting for your approval. The first manager to approve clears it for everyone.'; }
+  else if(activeTab==='centres'){ rows=batchesMyCentres(); hint.textContent='Every batch in the profit centre(s) you manage — full history, read-only. Approve live ones from “To approve”.'; }
+  else { rows=batchesOversight(); hint.textContent='Every batch across all profit centres, for audit. Read-only.'; }
+  $('#batchesCount').textContent=rows.length+(rows.length===1?' batch':' batches');
+  const list=$('#batchesList');
+  if(rows.length===0){ list.innerHTML='<div class="empty"><h3>Nothing here</h3><p>This view is empty right now.</p></div>'; return; }
+  list.innerHTML=''; rows.forEach(b=>list.appendChild(renderBatch(b))); }
+function chipForBatch(b){ const a=approverFor(b);
+  if(isPending(b)&&a.tier==='manager'&&a.managerIds.length===0) return {cls:'flag',text:'Unrouted'};
+  const s=(b.status||'').toLowerCase();
+  if(s.includes('approve')) return {cls:'approved',text:b.status}; if(s.includes('reject')) return {cls:'rejected',text:b.status};
+  if(s.includes('pending')) return {cls:'pending',text:b.status}; return {cls:'neutral',text:b.status||'unknown'}; }
+function renderBatch(b){ const card=document.createElement('div'); const a=approverFor(b);
+  const unrouted=isPending(b)&&a.tier==='manager'&&a.managerIds.length===0; card.className='batch'+(unrouted?' flagged':'');
+  const count=Array.isArray(b.transaction_ids)?b.transaction_ids.length:0; const chip=chipForBatch(b);
+  card.innerHTML=`<div class="batch-head"><div><div class="who">${nameOf(b.employee_id)} <span style="font-weight:400;color:var(--muted);font-size:12.5px">· ${roleOf(b.employee_id)||'—'}</span></div>
+    <div class="meta">Batch #${b.id} · <b>${b.profit_center||'—'}</b> · ${count} claim${count===1?'':'s'} · ${fmtDate(b.created_date)}${a.escalated?' · <span style="color:var(--flag);font-weight:600">Escalated &gt;'+money(escThreshold()).replace(/\s/g,'')+'</span>':''}</div></div>
+    <div class="amt2 num">${money(b.total_amount)}<small>${count} item${count===1?'':'s'}</small></div>
+    <span class="chip ${chip.cls}">${chip.text}</span></div><div class="body" id="body-${b.id}"></div>`;
+  card.querySelector('.batch-head').onclick=()=>toggleBatch(b); return card; }
+async function toggleBatch(b){ const body=$('#body-'+b.id);
+  if(body.classList.contains('open')){ body.classList.remove('open'); return; }
+  body.classList.add('open'); body.innerHTML='<p class="meta" style="padding:12px 0"><span class="spinner"></span>Loading claim lines…</p>';
+  const ids=Array.isArray(b.transaction_ids)?b.transaction_ids:[];
+  if(ids.length===0){ body.innerHTML='<p class="meta" style="padding:12px 0">No claim lines recorded.</p>'; return; }
+  const { data:txns, error } = await sb.from('transactions').select('*').in('id', ids);
+  if(error){ body.innerHTML='<p class="meta" style="padding:12px 0;color:var(--reject)">Could not load claims: '+explain(error)+'</p>'; return; }
+  let docMap={}; const { data:docs } = await sb.from('documents').select('transaction_id, file_url, file_type, upload_date, file_hash').in('transaction_id', ids);
+  (docs||[]).forEach(d=>{ docMap[d.transaction_id]=d; });
+  const flags = await findDuplicates(txns||[], docMap);
+  const rowsHtml=(txns||[]).map(t=>{ const d=docMap[t.id];
+    const receipt=d?`<a class="receipt" href="${d.file_url}" target="_blank" rel="noopener">View receipt</a><div class="meta">${(d.file_type||'file')} · ${fmtDate(d.upload_date)}</div>`:`<span class="noreceipt">No receipt</span>`;
+    const flg=(flags[t.id]||[]).length?`<div class="meta" style="color:var(--flag);margin-top:4px">⚠ ${flags[t.id].join('<br>⚠ ')}</div>`:'';
+    return `<tr><td>${fmtDate(t.claim_date)}</td><td><div class="vendor">${t.vendor||'—'}</div><div class="meta">${t.description||''}</div>${flg}</td><td>${t.category||'—'}</td><td>${receipt}</td><td class="r num">${money(t.amount)}</td></tr>`; }).join('');
+  const a=approverFor(b); let routeText;
+  if(a.tier==='self') routeText=`Submitted by a Director — <b>self-approved</b>.`;
+  else if(a.tier==='director' && a.escalated) routeText=`<span style="color:var(--flag)">Over ${money(escThreshold())} — <b>escalated to a Director</b> for approval.</span>`;
+  else if(a.tier==='director') routeText=`Submitted by a Manager — approval sits with a <b>Director</b>.`;
+  else if(a.managerIds.length===0) routeText=`<span style="color:var(--flag)"><b>Unrouted:</b> ${b.profit_center||'no profit centre'} has no Manager assigned.</span>`;
+  else routeText=`Approval sits with <b>${a.managerIds.map(nameOf).join(' or ')}</b> (Manager${a.managerIds.length>1?'s':''}, ${b.profit_center}). First to approve clears it.`;
+  let footer;
+  if(!isPending(b)){ const by=b.approved_by_manager_id?nameOf(b.approved_by_manager_id):'—'; const self=b.approved_by_manager_id&&b.approved_by_manager_id===b.employee_id;
+    footer=`<div class="decided">Decision: <b style="text-transform:capitalize">${b.status}</b> on ${fmtDate(b.approved_date)} by ${by}${self?' · <b>Self-approved · Director</b>':''}.`+(b.rejection_remarks?`<br>Remarks: ${b.rejection_remarks}`:'')+`</div>`;
+  } else if(activeTab==='approve'&&canIActOn(b)){ const selfNote=(a.tier==='self')?' <span class="meta">(your own batch — self-approval is logged)</span>':'';
+    footer=`<div class="actions"><button class="btn btn-approve" onclick="decide(${b.id},'approve')">Approve batch</button><button class="btn btn-reject" onclick="decide(${b.id},'reject')">Reject…</button></div>${selfNote}`;
+  } else if(canIActOn(b)){ footer=`<div class="decided">You can action this from the <b>To approve</b> tab.</div>`;
+  } else if(b.employee_id===me.id){ footer=`<div class="decided">Awaiting approval. You cannot approve your own submission.</div>`;
+  } else { footer=`<div class="decided">Awaiting approval.</div>`; }
+  body.innerHTML=`<table><thead><tr><th>Date</th><th>Vendor / detail</th><th>Category</th><th>Receipt</th><th class="r">Amount</th></tr></thead><tbody>${rowsHtml}</tbody></table><div class="route">${routeText}</div>${footer}`; }
+async function decide(batchId, action){ const b=allBatches.find(x=>x.id===batchId);
+  if(!b||!canIActOn(b)){ alert('You are not the approver for this batch.'); return; }
+  let update, remarks=null;
+  if(action==='approve'){ update={ status:'approved', approved_date:new Date().toISOString(), approved_by_manager_id:me.id }; }
+  else { remarks=prompt('Reason for rejection (the employee will see this on their returned drafts):'); if(remarks===null) return;
+    update={ status:'rejected', approved_date:new Date().toISOString(), approved_by_manager_id:me.id, rejection_remarks:remarks }; }
+  setStatus('<span class="spinner"></span>Saving decision…','info');
+  const { data:updated, error } = await sb.from('batches').update(update).eq('id',batchId).eq('status','pending').select();
+  if(error){ setStatus('<b>Could not save.</b><br>'+explain(error),'err'); return; }
+  if(!updated||updated.length===0){ setStatus('This batch was just decided by another approver — refreshing.','info'); setTimeout(()=>setStatus(''),2400); await refresh(); return; }
+  if(action==='reject'){ const ids=Array.isArray(b.transaction_ids)?b.transaction_ids:[];
+    if(ids.length){ const { error:te } = await sb.from('transactions').update({status:'draft'}).in('id', ids);
+      if(te){ setStatus('Batch rejected, but the claims could not be returned: '+explain(te),'err'); setTimeout(()=>setStatus(''),3500); await refresh(); return; } }
+    await audit('batch.reject','batch',batchId,`Rejected batch #${batchId} · ${money(b.total_amount)} · ${b.profit_center}`,{remarks});
+    setStatus('Batch rejected and returned to the employee’s drafts.','info');
+  } else { const esc=approverFor(b).escalated; await audit('batch.approve','batch',batchId,`Approved batch #${batchId} · ${money(b.total_amount)} · ${b.profit_center}${esc?' (escalated >'+money(escThreshold())+')':''}`,esc?{escalated:true}:undefined); setStatus('Batch approved.','info'); }
+  setTimeout(()=>setStatus(''),1800); await refresh(); }
+
+// ===== Finance side (Phase 5: export approved batches per profit centre) =====
+async function sha256(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function downloadFile(filename, content){
+  const blob=new Blob([content],{type:'text/plain'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+let exportBank={}, allExports=[], recEditing=null;
+async function renderExport(){
+  const list=$('#exportList'); list.innerHTML='<p class="hint"><span class="spinner"></span>Loading approved payments…</p>';
+  // load all exports once — used for both the per-centre lock and the recent list
+  const { data:exps } = await sb.from('payment_exports').select('*').order('export_date',{ascending:false}).limit(50);
+  allExports = exps || [];
+  const outstanding = {}; // profit centre -> its unreconciled export (only one allowed at a time)
+  allExports.forEach(e=>{ const pc=e.profit_center; if(pc && (e.status||'').toLowerCase()==='exported' && !outstanding[pc]) outstanding[pc]=e; });
+
+  // float-funded batches are approved by the manager but NEVER paid — the cash was already advanced
+  const approvedAll=allBatches.filter(b=>(b.status||'').toLowerCase()==='approved' && (b.funding_source||'own')!=='float');
+  const empIds=[...new Set(approvedAll.map(b=>b.employee_id))]; exportBank={};
+  if(empIds.length){ const { data:us } = await sb.from('users').select('id,name,surname,employee_number,bank_name,bank_code,bank_account,bank_confirmed').in('id',empIds); (us||[]).forEach(u=>exportBank[u.id]=u); }
+  // banking-confirmation gate: batches whose employee has unconfirmed banking are held out of payment
+  const held = approvedAll.filter(b=>{ const u=exportBank[b.employee_id]; return u && u.bank_confirmed===false; });
+  const approved = approvedAll.filter(b=>{ const u=exportBank[b.employee_id]; return !(u && u.bank_confirmed===false); });
+  const groups={}; approved.forEach(b=>{ const pc=b.profit_center||'—'; (groups[pc]=groups[pc]||[]).push(b); });
+  const centres=Object.keys(groups).sort();
+  $('#exportCount').textContent = approvedAll.length===0 ? '' : `${approved.length} payable across ${centres.length} centre${centres.length===1?'':'s'}${held.length?` · ${held.length} held for bank confirmation`:''}`;
+  list.innerHTML='';
+  // Bank approvals — company paying accounts set by Admin, awaiting Finance approval (always shown, even if nothing to pay)
+  const pendingAccts = allCentres.filter(c=>c.from_account && (c.account_status||'').toLowerCase()!=='approved' && (c.account_status||'').toLowerCase()!=='rejected');
+  if(pendingAccts.length){ const acard=document.createElement('div'); acard.className='batch flagged';
+    let abody=`<table><thead><tr><th>Centre</th><th>Paying account</th><th>Set by</th><th></th></tr></thead><tbody>`;
+    pendingAccts.forEach(c=>{ abody+=`<tr><td><b>${c.code}</b></td><td>${c.from_account}</td><td class="meta">Configuration</td><td class="r"><button class="btn-sm btn-submit2" data-acctok="${c.id}">Approve</button> <button class="btn-sm btn-del" data-acctno="${c.id}">Reject…</button></td></tr>`; });
+    abody+=`</tbody></table><div class="note" style="color:var(--pending);margin-top:12px">⚠ These paying accounts were set in Configuration and need your approval before any payment can be exported from those centres. Verify each account is correct.</div>`;
+    acard.innerHTML=`<div class="batch-head" style="cursor:default"><div><div class="who">Bank approvals</div><div class="meta">${pendingAccts.length} paying account${pendingAccts.length===1?'':'s'} awaiting your approval</div></div><div></div><span class="chip flag">Action needed</span></div><div class="body open">${abody}</div>`;
+    list.appendChild(acard); }
+  if(approvedAll.length===0){
+    const empty=document.createElement('div'); empty.className='empty';
+    empty.innerHTML='<h3>Nothing to pay right now</h3><p>Approved batches appear here, grouped by profit centre, ready to export.</p>';
+    list.appendChild(empty);
+    list.querySelectorAll('[data-acctok]').forEach(btn=>btn.onclick=()=>approveAccount(Number(btn.dataset.acctok)));
+    list.querySelectorAll('[data-acctno]').forEach(btn=>btn.onclick=()=>rejectAccount(Number(btn.dataset.acctno)));
+    renderRecentExports(); return;
+  }
+  // held-for-bank-confirmation section (employee banking)
+  if(held.length){ const hcard=document.createElement('div'); hcard.className='batch flagged';
+    let hbody=`<table><thead><tr><th>Employee</th><th>Centre</th><th class="r">Amount</th></tr></thead><tbody>`;
+    held.forEach(b=>{ hbody+=`<tr><td>${nameOf(b.employee_id)}</td><td>${b.profit_center||'—'}</td><td class="r num">${money(b.total_amount)}</td></tr>`; });
+    hbody+=`</tbody></table><div class="note" style="color:var(--pending);margin-top:12px">⚠ These employees' banking details were recently changed by HR and have not yet been confirmed by the employee. They cannot be paid until each employee confirms their new account.</div>`;
+    hcard.innerHTML=`<div class="batch-head" style="cursor:default"><div><div class="who">Held — awaiting bank confirmation</div><div class="meta">${held.length} payment${held.length===1?'':'s'} on hold</div></div><div></div><span class="chip flag">On hold</span></div><div class="body open">${hbody}</div>`;
+    list.appendChild(hcard); }
+  centres.forEach(pc=>{ const group=groups[pc]; const subtotal=group.reduce((s,b)=>s+Number(b.total_amount||0),0);
+    let body=`<table><thead><tr><th>Employee</th><th>Bank</th><th>Account</th><th>Reference</th><th class="r">Amount</th></tr></thead><tbody>`;
+    group.forEach(b=>{ const u=exportBank[b.employee_id]||{};
+      body+=`<tr><td>${nameOf(b.employee_id)}<div class="meta">${u.employee_number||''}</div></td><td>${u.bank_name||'—'}<div class="meta">code ${u.bank_code||'—'}</div></td><td>${u.bank_account||'—'}</td><td>${b.id}-${pc}</td><td class="r num">${money(b.total_amount)}</td></tr>`; });
+    body+=`</tbody></table>`;
+    const block = outstanding[pc];
+    const centre = allCentres.find(c=>c.code===pc);
+    const acctOk = centre && centre.from_account && (centre.account_status||'').toLowerCase()==='approved';
+    let action;
+    if(block) action=`<div class="note" style="color:var(--pending);margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">⚠ Export blocked — <b>${block.export_reference}</b> (${money(block.total_amount)}) for ${pc} is still awaiting reconciliation. Confirm that payment below before exporting again.</div>`;
+    else if(!acctOk){ const why = !centre||!centre.from_account ? `${pc} has no paying account set — an Administrator must set it in Configuration.` : `${pc}'s paying account is awaiting approval (see Bank approvals above) before payments can be exported.`;
+      action=`<div class="note" style="color:var(--pending);margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">⚠ ${why}</div>`; }
+    else action=`<div class="actions"><button class="btn btn-approve" data-export="${pc}">Export ${pc}…</button></div>`;
+    const holdLabel = block?'blocked until reconciled':(!acctOk?'paying account not approved':'ready to export');
+    const card=document.createElement('div'); card.className='batch';
+    card.innerHTML=`<div class="batch-head" style="cursor:default"><div><div class="who">${pc}</div><div class="meta">${group.length} payment${group.length===1?'':'s'} · ${holdLabel}</div></div>
+      <div class="amt2 num">${money(subtotal)}<small>${group.length} line${group.length===1?'':'s'}</small></div><span class="chip ${(block||!acctOk)?'flag':'approved'}">${(block||!acctOk)?'On hold':'Approved'}</span></div>
+      <div class="body open">${body}${action}</div>`;
+    list.appendChild(card); });
+  list.querySelectorAll('[data-export]').forEach(btn=>btn.onclick=()=>doExport(btn.dataset.export, groups[btn.dataset.export]));
+  list.querySelectorAll('[data-acctok]').forEach(btn=>btn.onclick=()=>approveAccount(Number(btn.dataset.acctok)));
+  list.querySelectorAll('[data-acctno]').forEach(btn=>btn.onclick=()=>rejectAccount(Number(btn.dataset.acctno)));
+  renderRecentExports();
+}
+async function approveAccount(id){
+  const c=allCentres.find(x=>x.id===id); if(!c) return;
+  if(!confirm(`Approve ${c.code}'s paying account ${c.from_account}? Payments will be allowed to this account.`)) return;
+  const { error } = await sb.rpc('approve_centre_account',{ p_centre_id:id });
+  if(error){ toast('Could not approve: '+explain(error)); return; }
+  await audit('payment.account_approve','profit_centre',id,`Approved paying account for ${c.code}: ${c.from_account}`,{account:c.from_account});
+  toast(`${c.code} paying account approved`); await refresh(); renderExport(); refreshFinanceBanner();
+}
+async function rejectAccount(id){
+  const c=allCentres.find(x=>x.id===id); if(!c) return;
+  const reason=prompt(`Reason for rejecting ${c.code}'s paying account:`); if(reason===null) return;
+  const { error } = await sb.rpc('reject_centre_account',{ p_centre_id:id, p_reason:reason });
+  if(error){ toast('Could not reject: '+explain(error)); return; }
+  await audit('payment.account_reject','profit_centre',id,`Rejected paying account for ${c.code}: ${c.from_account}`,{account:c.from_account, reason});
+  toast(`${c.code} paying account rejected`); await refresh(); renderExport(); refreshFinanceBanner();
+}
+let expPc=null, expGroup=null;
+function doExport(pc, group){
+  if(!group||!group.length) return;
+  const centre = allCentres.find(c=>c.code===pc);
+  if(!centre || !centre.from_account){ toast(`${pc} has no paying account set — an Administrator must configure it first.`); return; }
+  if((centre.account_status||'').toLowerCase()!=='approved'){ toast(`${pc}'s paying account must be approved (see Bank approvals) before you can export.`); return; }
+  const block = allExports.find(e=>e.profit_center===pc && (e.status||'').toLowerCase()==='exported');
+  if(block){ toast(`${pc} has an unreconciled export (${block.export_reference}). Confirm that payment first.`); return; }
+  expPc=pc; expGroup=group;
+  const total=group.reduce((s,b)=>s+Number(b.total_amount||0),0);
+  $('#expSummary').innerHTML=`<b>${pc}</b> · ${group.length} payment${group.length===1?'':'s'} · ${money(total)}`;
+  $('#exp-seed').value='';
+  // pre-fill the from-account from the centre's configuration (Bank Setup)
+  const fromAcc = (centre && centre.from_account) ? centre.from_account : '';
+  $('#exp-from').value = fromAcc; $('#exp-from').readOnly = !!fromAcc;
+  const note=$('#exp-from-note');
+  if(fromAcc){ note.textContent=`Configured paying account for ${pc}.`; note.style.color='var(--muted)'; }
+  else { note.textContent=`⚠ No paying account is configured for ${pc}. Ask your Administrator to set it in Configuration, or enter it manually below.`; note.style.color='var(--pending)'; }
+  toggleNetbankFields();
+  $('#expModal').classList.add('open');
+}
+function closeExport(){ $('#expModal').classList.remove('open'); }
+function toggleNetbankFields(){ /* NetBank is the only format; fields always shown */ }
+
+// NetBank Business (secure format) helpers — verified against Nedbank's spec worked example
+function netbankTimestamp(d){ const p=n=>String(n).padStart(2,'0'); let h=d.getHours(); const ap=h<12?'am':'pm'; let h12=h%12; if(h12===0)h12=12; return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(h12)}:${p(d.getMinutes())}:${p(d.getSeconds())} ${ap}`; }
+function nbClean(s,maxLen){ s=(s==null?'':String(s)); s=s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); s=s.replace(/,/g,' ').replace(/[^\x20-\x7E]/g,''); if(maxLen) s=s.slice(0,maxLen); return s; }
+async function hmacSha1Hex(seed,msg){ const enc=new TextEncoder(); const k=await crypto.subtle.importKey('raw',enc.encode(seed),{name:'HMAC',hash:'SHA-1'},false,['sign']); const sig=await crypto.subtle.sign('HMAC',k,enc.encode(msg)); return [...new Uint8Array(sig)].map(b=>b.toString(16).padStart(2,'0')).join('').toUpperCase(); }
+async function buildNetbankFile(ref, pc, group, bank, fromAccount, seed){
+  const header=`${nbClean(ref,50)},${netbankTimestamp(new Date())}`;
+  const lines=[header]; let total=0;
+  group.forEach(b=>{ const u=bank[b.employee_id]||{}; const amt=Number(b.total_amount||0); total+=amt;
+    lines.push([
+      nbClean(fromAccount,23),                             // from account (debited)
+      nbClean(ref,30),                                     // my statement description = export reference
+      nbClean(u.bank_account,23),                          // beneficiary account
+      '',                                                  // beneficiary sub-account (blank)
+      nbClean(u.bank_code,6),                              // branch code
+      nbClean(`${u.name||''} ${u.surname||''}`.trim(),100),// beneficiary name
+      nbClean(`${b.id}-${pc}`,30),                         // beneficiary statement description
+      amt.toFixed(2),                                      // amount
+      'FALSE'                                              // proof of payment
+    ].join(',')); });
+  const hashBody = lines.join('\n') + '\n' + `${group.length},${total.toFixed(2)},`; // ends in comma, LF endings
+  const hash = await hmacSha1Hex(seed, hashBody);
+  return { file: hashBody + hash, hash };                  // file ends at the last hash digit, no trailing newline
+}
+
+async function runExport(){
+  const pc=expPc, group=expGroup; if(!group||!group.length) return;
+  const fromAccount=$('#exp-from').value.trim(), seed=$('#exp-seed').value.trim();
+  if(!fromAccount){ toast('Enter the from-account for this centre.'); return; }
+  if(!seed){ toast('Enter your NetBank Business seed.'); return; }
+  if(seed.length!==32){ toast('The seed should be exactly 32 characters.'); return; }
+  const block = allExports.find(e=>e.profit_center===pc && (e.status||'').toLowerCase()==='exported');
+  if(block){ toast(`${pc} has an unreconciled export (${block.export_reference}). Confirm that payment first.`); return; }
+  closeExport();
+  setStatus('<span class="spinner"></span>Generating export…','info');
+  const { count } = await sb.from('payment_exports').select('id',{count:'exact',head:true}).eq('profit_center',pc);
+  const ref=`EXP-${pc}-${String((count||0)+1).padStart(4,'0')}`;
+  const total=group.reduce((s,b)=>s+Number(b.total_amount||0),0);
+  const batchIds=group.map(b=>b.id);
+  const r=await buildNetbankFile(ref, pc, group, exportBank, fromAccount, seed);
+  const file=r.file, hash=r.hash, fmtLabel='NetBank', filename=ref+'_NetBank.csv';
+  const { error:ie } = await sb.from('payment_exports').insert({ export_reference:ref, profit_center:pc, batch_ids:batchIds, total_amount:total, transaction_count:group.length, file_hash:hash, bank_format:fmtLabel, status:'exported', exported_by_finance_id:me.id, export_date:new Date().toISOString() });
+  if(ie){ setStatus('<b>Could not record the export.</b><br>'+explain(ie),'err'); return; }
+  const { error:ue } = await sb.from('batches').update({status:'exported'}).in('id',batchIds).eq('status','approved');
+  if(ue){ setStatus('Export recorded, but the batches could not be updated: '+explain(ue),'err'); }
+  downloadFile(filename, file);
+  await audit('payment.export','export',ref,`Exported ${ref} · ${pc} · ${money(total)} · ${fmtLabel}`,{format:fmtLabel, count:group.length, hash});
+  setStatus(`Exported <b>${ref}</b> · ${money(total)} · ${fmtLabel} file downloaded, integrity hash stored.`,'info'); setTimeout(()=>setStatus(''),3400);
+  await refresh(); renderExport();
+}
+function renderRecentExports(){
+  const box=$('#recentExports'); if(!box) return;
+  if(!allExports.length){ box.innerHTML=''; return; }
+  let h='<h3 style="font-size:14px;margin:26px 0 10px;color:var(--ink)">Recent exports</h3>';
+  allExports.slice(0,10).forEach(e=>{ const n=Array.isArray(e.batch_ids)?e.batch_ids.length:'—'; const st=(e.status||'').toLowerCase(); const done=st==='reconciled';
+    h+=`<div class="claim"><div class="claim-top"><div><div class="vendor">${e.export_reference||('Export #'+e.id)}</div>
+      <div class="meta">${e.profit_center||'—'} · ${n} payment${n===1?'':'s'} · ${fmtDate(e.export_date)} · ${e.bank_format||'NetBank'}</div></div>
+      <div class="amount num">${money(e.total_amount)}</div><span class="chip ${done?'approved':'neutral'}" style="text-transform:none">${done?'Payment successful':(e.status||'exported')}</span></div>
+      <div class="meta" style="margin-top:8px;word-break:break-all">${(e.bank_format||'NetBank')==='NetBank'?'HMAC-SHA-1':'SHA-256'}: ${e.file_hash||'—'}</div>`;
+    if(done){ h+=`<div class="meta" style="margin-top:4px">Bank ref: <b>${e.bank_payment_reference||'—'}</b> · Paid ${fmtDate(e.date_paid)}</div>`; }
+    // post-export actions dropdown
+    let actions='';
+    if(st==='exported'){ actions=`<button class="dd-item" data-recact="confirm:${e.id}">Confirm payment</button><button class="dd-item" data-recact="delete:${e.id}">Delete export</button>`; }
+    else if(done){ actions=`<button class="dd-item" data-recact="edit:${e.id}">Edit payment details</button><button class="dd-item" data-recact="delete:${e.id}">Delete export</button>`; }
+    if(actions){ h+=`<div class="claim-actions"><div class="dropdown"><button class="btn-sm btn-edit dd-toggle">Actions ▾</button><div class="dd-menu">${actions}</div></div></div>`; }
+    h+=`</div>`; });
+  box.innerHTML=h;
+  box.querySelectorAll('.dd-toggle').forEach(b=>b.onclick=(ev)=>{ ev.stopPropagation(); const m=b.nextElementSibling; const open=m.classList.contains('show'); box.querySelectorAll('.dd-menu').forEach(x=>x.classList.remove('show')); if(!open) m.classList.add('show'); });
+  box.querySelectorAll('[data-recact]').forEach(b=>b.onclick=()=>{ const [act,id]=b.dataset.recact.split(':'); box.querySelectorAll('.dd-menu').forEach(x=>x.classList.remove('show')); postExportAction(act, Number(id)); });
+}
+document.addEventListener('click',()=>{ document.querySelectorAll('.dd-menu.show').forEach(m=>m.classList.remove('show')); });
+function postExportAction(act, id){
+  if(act==='confirm') openReconcile(id);
+  else if(act==='edit') openReconcileEdit(id);
+  else if(act==='delete') deleteExport(id);
+}
+async function deleteExport(id){
+  const e=allExports.find(x=>x.id===id); if(!e) return;
+  const done=(e.status||'').toLowerCase()==='reconciled';
+  const msg = done
+    ? `Delete ${e.export_reference}?\n\nThis was already marked paid. Deleting it will REMOVE the export record and return its ${Array.isArray(e.batch_ids)?e.batch_ids.length:''} batch(es) to “approved” so they can be re-exported. Only do this to correct a genuine mistake.`
+    : `Delete ${e.export_reference}?\n\nThis cancels the export and returns its batch(es) to “approved” so they can be exported again.`;
+  if(!confirm(msg)) return;
+  const ids=Array.isArray(e.batch_ids)?e.batch_ids:[];
+  if(ids.length){ const { error:be } = await sb.from('batches').update({status:'approved'}).in('id',ids); if(be){ toast('Could not return the batches: '+explain(be)); return; } }
+  const { error } = await sb.from('payment_exports').delete().eq('id',id);
+  if(error){ toast('Could not delete the export: '+explain(error)); return; }
+  await audit('payment.export_delete','export',e.export_reference,`Deleted export ${e.export_reference} · ${money(e.total_amount)} · batches returned to approved${done?' (was reconciled)':''}`,{was_status:e.status});
+  toast(`${e.export_reference} deleted — batches returned to approved`); await refresh(); renderExport();
+}
+let recMode='confirm';
+function openReconcile(id){ const e=allExports.find(x=>x.id===id); if(!e) return; recEditing=e; recMode='confirm';
+  $('#recModal').querySelector('h3').textContent='Confirm payment';
+  $('#recSummary').innerHTML=`<b>${e.export_reference}</b> · ${e.profit_center}<br>${money(e.total_amount)} · ${Array.isArray(e.batch_ids)?e.batch_ids.length:'—'} payment(s)`;
+  $('#rec-ref').value=''; $('#rec-date').valueAsDate=new Date(); $('#recModal').classList.add('open'); }
+function openReconcileEdit(id){ const e=allExports.find(x=>x.id===id); if(!e) return; recEditing=e; recMode='edit';
+  $('#recModal').querySelector('h3').textContent='Edit payment details';
+  $('#recSummary').innerHTML=`<b>${e.export_reference}</b> · ${e.profit_center}<br>${money(e.total_amount)} · already marked paid — correct the details below.`;
+  $('#rec-ref').value=e.bank_payment_reference||''; if(e.date_paid){ $('#rec-date').value=e.date_paid; } else { $('#rec-date').valueAsDate=new Date(); }
+  $('#recModal').classList.add('open'); }
+function closeReconcile(){ $('#recModal').classList.remove('open'); recEditing=null; }
+async function doReconcile(){ const e=recEditing; if(!e) return;
+  const ref=$('#rec-ref').value.trim(), date=$('#rec-date').value;
+  if(!ref){ toast('Enter the bank payment reference.'); return; }
+  if(recMode==='edit'){
+    const { error } = await sb.from('payment_exports').update({ bank_payment_reference:ref, date_paid:date }).eq('id',e.id);
+    if(error){ toast('Could not update: '+explain(error)); return; }
+    await audit('payment.reconcile_edit','export',e.export_reference,`Edited payment details for ${e.export_reference}: bank ref ${ref}`,{bank_ref:ref, date_paid:date});
+    toast('Payment details updated'); closeReconcile(); await refresh(); renderExport(); return;
+  }
+  setStatus('<span class="spinner"></span>Recording payment…','info');
+  const { data:updated, error } = await sb.from('payment_exports').update({ status:'reconciled', bank_payment_reference:ref, date_paid:date, reconciled_by:me.id, reconciled_date:new Date().toISOString() }).eq('id',e.id).eq('status','exported').select();
+  if(error){ setStatus('Could not record the payment: '+explain(error),'err'); return; }
+  if(!updated||!updated.length){ setStatus('That export was already reconciled — refreshing.','info'); closeReconcile(); await refresh(); renderExport(); setTimeout(()=>setStatus(''),2200); return; }
+  const ids=Array.isArray(e.batch_ids)?e.batch_ids:[];
+  if(ids.length){ const { error:be } = await sb.from('batches').update({status:'reconciled'}).in('id',ids).eq('status','exported'); if(be) setStatus('Payment recorded, but batches not updated: '+explain(be),'err'); }
+  await audit('payment.reconcile','export',e.export_reference,`Reconciled ${e.export_reference} · bank ref ${ref} · ${money(e.total_amount)}`,{bank_ref:ref, date_paid:date});
+  setStatus(`<b>${e.export_reference}</b> marked Payment successful.`,'info'); setTimeout(()=>setStatus(''),2600);
+  closeReconcile(); await refresh(); renderExport();
+}
+
+// ===== configuration (IT Administrator) =====
+let rateEditing=null, pcEditing=null;
+let cfgSection='company';
+const CFG_SECTIONS=[['company','Company'],['rates','Mileage rates'],['centres','Profit centres'],['thresholds','Thresholds']];
+function showCfgSection(key){ cfgSection=key;
+  document.querySelectorAll('.cfg-section').forEach(s=>{ s.style.display = s.dataset.cfg===key?'block':'none'; });
+  document.querySelectorAll('#cfgNav button').forEach(b=>{ b.classList.toggle('active', b.dataset.cfgnav===key); });
+}
+function renderCfgNav(){ const nav=$('#cfgNav'); if(!nav) return; nav.innerHTML='';
+  CFG_SECTIONS.forEach(([key,label])=>{ const b=document.createElement('button'); b.textContent=label; b.dataset.cfgnav=key; if(key===cfgSection) b.className='active'; b.onclick=()=>showCfgSection(key); nav.appendChild(b); });
+}
+function renderAdmin(){ renderCfgNav(); showCfgSection(cfgSection); renderRatesList(); renderCentresList(); const t=$('#cfg-threshold'); if(t) t.value = (appConfig && appConfig.escalation_threshold) || 15000; const f=$('#cfg-dupfloor'); if(f) f.value = (appConfig && appConfig.duplicate_floor) || 100;
+  const cn=$('#cfg-coname'); if(cn) cn.value = (appConfig && appConfig.company_name) || '';
+  const cd=$('#cfg-codomains'); if(cd) cd.value = (appConfig && appConfig.email_domains) || companyInfo.email_domains.join(', ');
+}
+async function saveCompany(){
+  const name=$('#cfg-coname').value.trim();
+  const raw=$('#cfg-codomains').value.trim();
+  const list=raw.split(',').map(s=>s.trim().toLowerCase().replace(/^@/,'')).filter(Boolean);
+  if(!list.length){ toast('Enter at least one email domain — otherwise nobody could register.'); return; }
+  const bad=list.find(d=>!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(d));
+  if(bad){ toast(`"${bad}" doesn't look like a valid domain. Use the form company.co.za, without the @.`); return; }
+  const domains=list.join(',');
+  const { error } = await sb.from('app_config').upsert([
+    { key:'company_name',  value:name,    updated_by:me.id, updated_date:new Date().toISOString() },
+    { key:'email_domains', value:domains, updated_by:me.id, updated_date:new Date().toISOString() }
+  ],{onConflict:'key'});
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  await audit('config.company_edit','app_config','company',`Updated company details — name: ${name||'(blank)'}, domains: ${domains}`,{name, domains});
+  toast('Company details saved'); await refresh(); await loadCompanyInfo(); renderAdmin();
+}
+async function saveDupFloor(){
+  const v=parseFloat($('#cfg-dupfloor').value);
+  if(isNaN(v)||v<0){ toast('Enter a valid floor amount.'); return; }
+  const { error } = await sb.from('app_config').upsert({ key:'duplicate_floor', value:String(v), updated_by:me.id, updated_date:new Date().toISOString() },{onConflict:'key'});
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  await audit('config.dupfloor_edit','app_config','duplicate_floor',`Set duplicate-alarm floor to ${money(v)}`,{value:v});
+  toast('Duplicate floor saved'); await refresh(); renderAdmin();
+}
+async function saveThreshold(){
+  const v=parseFloat($('#cfg-threshold').value);
+  if(!v||v<=0){ toast('Enter a valid threshold amount.'); return; }
+  const { error } = await sb.from('app_config').upsert({ key:'escalation_threshold', value:String(v), updated_by:me.id, updated_date:new Date().toISOString() },{onConflict:'key'});
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  await audit('config.threshold_edit','app_config','escalation_threshold',`Set escalation threshold to ${money(v)}`,{value:v});
+  toast('Threshold saved'); await refresh(); renderAdmin();
+}
+async function generateBatches(){
+  setStatus('<span class="spinner"></span>Generating batches…','info');
+  const { data:pend, error } = await sb.from('transactions').select('id,employee_id,profit_center,amount,funding_source').eq('status','pending_approval');
+  if(error){ setStatus('Could not read claims: '+explain(error),'err'); return; }
+  if(!pend || !pend.length){ setStatus('No claims are awaiting batching.','info'); setTimeout(()=>setStatus(''),2600); return; }
+  const groups={};
+  pend.forEach(t=>{ const fs=t.funding_source||'own'; const k=t.employee_id+'|'+(t.profit_center||'')+'|'+fs; groups[k]=groups[k]||{employee_id:t.employee_id, profit_center:t.profit_center, funding_source:fs, ids:[], total:0}; groups[k].ids.push(t.id); groups[k].total+=Number(t.amount||0); });
+  let made=0, claimsBatched=0;
+  for(const k in groups){ const g=groups[k];
+    const { error:ie } = await sb.from('batches').insert({ employee_id:g.employee_id, profit_center:g.profit_center, transaction_ids:g.ids, total_amount:g.total, funding_source:g.funding_source, status:'pending', created_date:new Date().toISOString() });
+    if(ie){ setStatus('Batch insert failed: '+explain(ie),'err'); return; }
+    const { error:ue } = await sb.from('transactions').update({status:'batched'}).in('id',g.ids).eq('status','pending_approval');
+    if(ue){ setStatus('Batch created but claims not updated: '+explain(ue),'err'); return; }
+    made++; claimsBatched+=g.ids.length;
+  }
+  await audit('batch.generate','batch',null,`Generated ${made} batch(es) from ${claimsBatched} claim(s)`,{batches:made, claims:claimsBatched});
+  setStatus(`Created ${made} batch${made===1?'':'es'} from ${claimsBatched} claim${claimsBatched===1?'':'s'}.`,'info'); setTimeout(()=>setStatus(''),3400);
+  await refresh(); renderAdmin();
+}
+
+// ===== Petty cash =====
+const ADV_LABEL = { requested:'Requested', issued:'Issued — confirm receipt', confirmed:'Confirmed', declined:'Declined', closed:'Closed' };
+async function balanceFor(empId){
+  const { data, error } = await sb.rpc('float_balance',{ p_employee_id:empId });
+  if(error) return null;
+  return Array.isArray(data)? data[0] : data;
+}
+function advanceCard(a){
+  const advanced=Number(a.amount||0), accounted=Number(a.accounted||0), awaiting=Number(a.awaiting||0);
+  const remaining=Number(a.remaining!=null?a.remaining:advanced-accounted);
+  const cls=remaining<0?'var(--flag)':'var(--ink)';
+  return `<div class="pc-card" style="border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+      <div><div class="vendor">${money(advanced)} · ${a.method==='eft'?'EFT':'Cash'}</div>
+        <div class="meta">${a.reason||'—'}${a.confirmed_date?' · confirmed '+fmtDate(a.confirmed_date):''}</div></div>
+      ${a.closeout_requested?'<span class="chip flag" style="text-transform:none">close-out asked</span>':'<span class="chip approved" style="text-transform:none">Open</span>'}
+    </div>
+    <div class="dash-stats">
+      ${dashStat(money(advanced),'Advanced')}
+      ${dashStat(money(accounted),'Accounted for')}
+      ${dashStat(money(awaiting),'Awaiting approval')}
+      <div class="dash-stat"><div class="val" style="color:${cls}">${money(remaining)}</div><div class="lbl">${remaining<0?'Overspent':'Cash you should hold'}</div></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-sm btn-submit2" data-pcacct="${a.id}">Account for an expense</button>
+      <button class="btn-sm" data-pcdrilladv="${a.id}">See expenses</button>
+      ${a.closeout_requested?'':`<button class="btn-sm btn-edit" data-pcclosereq="${a.id}">Request close-out</button>`}
+    </div>
+  </div>`;
+}
+async function renderPetty(){
+  const { data:d } = await sb.rpc('petty_detail',{ p_employee_id:me.id });
+  const advances=(d&&d.advances)||[];
+  const open=advances.filter(a=>(a.status||'')==='confirmed');
+  const activeCount=myAdvances.filter(a=>['requested','issued','confirmed'].includes(a.status||'')).length;
+  const reqBtn=$('#pcRequestBtn');
+  if(reqBtn){ reqBtn.disabled=activeCount>=3; reqBtn.title=activeCount>=3?'You already have 3 active advances — close one first.':''; }
+  const spend=$('#pcSpendBtn'); if(spend) spend.style.display = open.length?'inline-block':'none';
+  const top=$('#pettyBalance');
+  top.innerHTML = open.length
+    ? '<h3 style="font-size:14px;margin:6px 0 12px">Open advances</h3>'+open.map(advanceCard).join('')
+    : '<div class="note" style="background:var(--accent-soft);border:1px solid #cfe3e0;border-radius:10px;padding:12px 14px">You have no open advances. Request one above — Finance issues it, and you confirm receipt before spending.</div>';
+  top.querySelectorAll('[data-pcacct]').forEach(b=>b.onclick=()=>accountForAdvance(Number(b.dataset.pcacct)));
+  top.querySelectorAll('[data-pcdrilladv]').forEach(b=>b.onclick=()=>openPettyDrill(me.id, 'adv'+b.dataset.pcdrilladv));
+  top.querySelectorAll('[data-pcclosereq]').forEach(b=>b.onclick=()=>requestCloseout(Number(b.dataset.pcclosereq)));
+  if(activeCount>=3){ const w=document.createElement('p'); w.className='hint'; w.style.marginTop='4px'; w.textContent='You have 3 active advances — the maximum. Close one before requesting another.'; }
+  const box=$('#pettyList'); box.innerHTML='';
+  const history=advances.filter(a=>(a.status||'')!=='confirmed');
+  if(!history.length) return;
+  let h='<h3 style="font-size:14px;margin:24px 0 10px">Your advances (history)</h3>';
+  history.forEach(a=>{ const st=(a.status||'');
+    h+=`<div class="claim" data-histadv="${st==='closed'?a.id:''}" style="${st==='closed'?'cursor:pointer':''}"><div class="claim-top"><div><div class="vendor">${money(a.amount)} · ${a.method==='eft'?'EFT to your account':'Cash'}</div>
+      <div class="meta">${a.reason||'—'} · requested ${fmtDate(a.requested_date)}${a.issued_date?' · issued '+fmtDate(a.issued_date):''}${a.confirmed_date?' · confirmed '+fmtDate(a.confirmed_date):''}</div></div>
+      <span class="chip ${st==='closed'?'approved':(st==='declined'?'rejected':'neutral')}" style="text-transform:none">${ADV_LABEL[st]||st}</span></div>`;
+    if(a.remarks) h+=`<div class="meta" style="margin-top:6px">Note: ${a.remarks}</div>`;
+    if(st==='issued') h+=`<div class="claim-actions"><button class="btn-sm btn-submit2" data-pcconfirm="${a.id}">Yes, I received this</button></div>`;
+    h+='</div>'; });
+  box.innerHTML=h;
+  box.querySelectorAll('[data-pcconfirm]').forEach(btn=>btn.onclick=(e)=>{ e.stopPropagation(); confirmAdvance(Number(btn.dataset.pcconfirm)); });
+  box.querySelectorAll('[data-histadv]').forEach(el=>{ if(el.dataset.histadv) el.onclick=()=>openPettyDrill(me.id,'adv'+el.dataset.histadv); });
+}
+async function requestAdvance(){
+  const active=myAdvances.filter(a=>['requested','issued','confirmed'].includes(a.status||'')).length;
+  if(active>=3){ toast('You already have 3 active advances — close one before requesting another.'); return; }
+  const raw=prompt('How much do you need advanced? (R)'); if(raw===null) return;
+  const amt=parseFloat(raw); if(!amt||amt<=0){ toast('Enter a valid amount.'); return; }
+  const reason=prompt('What is it for? (each advance is for a specific purpose)'); if(reason===null) return;
+  const { error } = await sb.from('petty_cash_advances').insert({ employee_id:me.id, amount:amt, reason:reason||null, status:'requested', requested_date:new Date().toISOString() });
+  if(error){ toast(String(error.message||'').includes('PETTY_MAX_ADVANCES')?'You already have 3 active advances — close one first.':'Could not submit: '+explain(error)); return; }
+  await audit('petty.request','advance',null,`Requested a petty cash advance of ${money(amt)}`,{amount:amt, reason});
+  await notifyFinance('petty_request', `${me.name} ${me.surname} requested a petty cash advance of ${money(amt)}.`, {amount:amt, reason});
+  toast('Request sent to Finance'); await refresh(); renderPetty();
+}
+async function confirmAdvance(id){
+  const a=myAdvances.find(x=>x.id===id); if(!a) return;
+  if(!confirm(`Confirm you received ${money(a.amount)}? This is what you will be accountable for on this advance.`)) return;
+  const { error } = await sb.rpc('confirm_advance',{ p_id:id });
+  if(error){ toast('Could not confirm: '+explain(error)); return; }
+  await audit('petty.confirm','advance',id,`Confirmed receipt of ${money(a.amount)} petty cash`,{amount:a.amount});
+  toast('Receipt confirmed'); await refresh(); renderPetty();
+}
+function captureFloatExpense(){ captureFunding='float'; captureAdvanceId=null; activeTab='new'; buildTabs(); }
+function accountForAdvance(advanceId){ captureFunding='float'; captureAdvanceId=advanceId; activeTab='new'; buildTabs(); }
+async function requestCloseout(advanceId){
+  const a=myAdvances.find(x=>x.id===advanceId); if(!a) return;
+  if(!confirm(`Ask Finance to close this ${money(a.amount)} advance (${a.reason||'—'})?\n\nYou can keep capturing against it until they close it.`)) return;
+  const { error } = await sb.rpc('request_closeout',{ p_advance_id:advanceId });
+  if(error){ toast('Could not send: '+explain(error)); return; }
+  await audit('petty.closeout_request','advance',advanceId,`${me.name} ${me.surname} asked to close their ${money(a.amount)} advance`,{advance_id:advanceId});
+  await notifyFinance('petty_closeout', `${me.name} ${me.surname} asked you to close their ${money(a.amount)} advance.`, {advance_id:advanceId});
+  toast('Finance has been asked to close this advance'); await refresh(); renderPetty();
+}
+// ---- Finance side ----
+async function renderPettyFinance(){
+  const reqBox=$('#pcRequests'); const box=$('#pcHolders');
+  box.innerHTML='<p class="hint"><span class="spinner"></span>Loading…</p>';
+  const { data, error } = await sb.rpc('petty_advances');
+  if(error){ box.innerHTML='<p class="meta">Could not load: '+explain(error)+'</p>'; reqBox.innerHTML=''; return; }
+  pcAdvRows = data||[];
+  const pend=pcAdvRows.filter(a=>a.status==='requested');
+  if(pend.length){
+    let h='<div class="batch flagged" style="margin-bottom:18px"><div class="batch-head" style="cursor:default"><div><div class="who">Advance requests</div><div class="meta">'+pend.length+' awaiting you</div></div><div></div><span class="chip flag">Action needed</span></div><div class="body open"><table><thead><tr><th>Person</th><th>Amount</th><th>For</th><th></th></tr></thead><tbody>';
+    pend.forEach(a=>{ h+=`<tr><td>${a.employee_name}</td><td class="num">${money(a.amount)}</td><td>${a.reason||'—'}</td><td class="r"><button class="btn-sm btn-submit2" data-pcissue="${a.advance_id}">Issue…</button> <button class="btn-sm btn-del" data-pcdecline="${a.advance_id}">Decline…</button></td></tr>`; });
+    h+='</tbody></table></div></div>'; reqBox.innerHTML=h;
+    reqBox.querySelectorAll('[data-pcissue]').forEach(b=>b.onclick=()=>issueAdvance(Number(b.dataset.pcissue)));
+    reqBox.querySelectorAll('[data-pcdecline]').forEach(b=>b.onclick=()=>declineAdvance(Number(b.dataset.pcdecline)));
+  } else reqBox.innerHTML='';
+  const open=pcAdvRows.filter(a=>a.status==='confirmed');
+  if(!open.length){ box.innerHTML='<div class="empty"><h3>No open advances</h3><p>Confirmed advances appear here, each with its own live balance.</p></div>'; await renderOwesReport(); return; }
+  let h='<h3 style="font-size:14px;margin:22px 0 10px">Open advances</h3><table><thead><tr><th>Person</th><th>For</th><th class="r">Advanced</th><th class="r">Accounted</th><th class="r">Awaiting</th><th class="r">Should hold</th><th></th></tr></thead><tbody>';
+  open.forEach(a=>{ const remaining=Number(a.remaining||0);
+    const action = remaining < -0.005
+      ? `<button class="btn-sm btn-submit2" data-pcrefund="${a.advance_id}">Refund ${money(-remaining)}…</button> <button class="btn-sm btn-edit" data-pcclose="${a.advance_id}">Close…</button>`
+      : `<button class="btn-sm btn-edit" data-pcclose="${a.advance_id}">Close…</button>`;
+    h+=`<tr><td>${a.employee_name}${a.closeout_requested?' <span class="chip flag" style="text-transform:none">wants to close</span>':''}</td><td>${a.reason||'—'}</td><td class="r num">${money(a.amount)}</td><td class="r num">${money(a.accounted)}</td><td class="r num">${money(a.awaiting)}</td><td class="r num" style="font-weight:700;color:${remaining<0?'var(--flag)':'var(--ink)'}">${money(remaining)}</td><td class="r"><button class="btn-sm" data-pcviewadv="${a.advance_id}" data-emp="${a.employee_id}">View…</button> ${action}</td></tr>`; });
+  h+='</tbody></table>';
+  box.innerHTML=h;
+  box.querySelectorAll('[data-pcviewadv]').forEach(b=>b.onclick=()=>openPettyDrill(Number(b.dataset.emp),'adv'+b.dataset.pcviewadv));
+  box.querySelectorAll('[data-pcclose]').forEach(b=>b.onclick=()=>closeFloat(Number(b.dataset.pcclose)));
+  box.querySelectorAll('[data-pcrefund]').forEach(b=>b.onclick=()=>refundOverspend(Number(b.dataset.pcrefund)));
+  await renderOwesReport();
+}
+async function renderOwesReport(){
+  let box=$('#pcOwes');
+  if(!box){ box=document.createElement('div'); box.id='pcOwes'; $('#pcHolders').after(box); }
+  const { data, error } = await sb.rpc('all_debts');
+  if(error){ box.innerHTML=''; return; }
+  const debts=(data||[]).filter(d=>Number(d.owed||0)>0.005);
+  if(!debts.length){ box.innerHTML='<h3 style="font-size:14px;margin:26px 0 10px">Owed to the business</h3><p class="hint">Nobody currently owes the business. Shortfalls from close-outs appear here until repaid.</p>'; return; }
+  let h='<h3 style="font-size:14px;margin:26px 0 10px">Owed to the business</h3><p class="hint">Shortfalls recorded at close-out. A person cannot receive a new advance until their debt is cleared.</p><table><thead><tr><th>Person</th><th class="r">Shortfall</th><th class="r">Repaid</th><th class="r">Still owed</th><th></th></tr></thead><tbody>';
+  debts.forEach(d=>{ h+=`<tr><td>${nameOf(d.employee_id)}</td><td class="r num">${money(d.shortfall)}</td><td class="r num">${money(d.repaid)}</td><td class="r num" style="font-weight:700;color:var(--flag)">${money(d.owed)}</td><td class="r"><button class="btn-sm" data-pcview="${d.employee_id}">View…</button> <button class="btn-sm btn-submit2" data-pcrepay="${d.employee_id}">Record repayment…</button></td></tr>`; });
+  h+='</tbody></table>';
+  box.innerHTML=h;
+  box.querySelectorAll('[data-pcview]').forEach(b=>b.onclick=()=>openPettyDrill(Number(b.dataset.pcview)));
+  box.querySelectorAll('[data-pcrepay]').forEach(b=>b.onclick=()=>recordRepayment(Number(b.dataset.pcrepay)));
+}
+async function recordRepayment(empId){
+  const owed=await amountOwedBy(empId);
+  if(owed<=0.005){ toast('Nothing outstanding for this person.'); return; }
+  const raw=prompt(`${nameOf(empId)} owes the business ${money(owed)}.\n\nHow much was repaid now? (R)`, String(owed.toFixed(2)));
+  if(raw===null) return;
+  const amt=parseFloat(raw); if(!amt||amt<=0){ toast('Enter a valid amount.'); return; }
+  if(amt > owed + 0.005){ toast(`That's more than the ${money(owed)} owed. Enter ${money(owed)} or less.`); return; }
+  // which company account received it — evidence, not a label
+  const acctList = allCentres.filter(c=>c.from_account).map(c=>`${c.code}: ${c.from_account}`);
+  const into=prompt(`Which company bank account received the ${money(amt)}?\n\nType the account number (or pick from your paying accounts):\n${acctList.join('\n')||'(none set up yet)'}`);
+  if(into===null) return;
+  if(!into.trim()){ toast('The receiving account is required — this keeps the repayment traceable.'); return; }
+  const date=prompt('Date received (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+  if(date===null) return;
+  const remarks=prompt('Remarks (e.g. cash deposit, salary deduction, EFT reference):');
+  if(remarks===null) return;
+  const { error } = await sb.rpc('record_repayment',{ p_employee_id:empId, p_amount:amt, p_received_account:into.trim(), p_received_date:date, p_remarks:remarks||null });
+  if(error){ toast('Could not record: '+explain(error)); return; }
+  await audit('petty.repayment','advance',empId,`Recorded ${money(amt)} repayment from ${nameOf(empId)} into ${into.trim()} on ${date}`,{amount:amt, account:into.trim(), date, remarks});
+  toast(`Repayment of ${money(amt)} recorded`); await refresh(); renderPettyFinance();
+}
+async function issueAdvance(id){
+  const a=pcAdvRows.find(x=>Number(x.advance_id)===id) || allAdvances.find(x=>x.id===id); if(!a) return;
+  const empId=a.employee_id, amount=Number(a.amount), who=a.employee_name||nameOf(empId);
+  const owed=await amountOwedBy(empId);
+  if(owed>0.005){ toast(`${who} owes the business ${money(owed)} from a previous advance. Record repayment before issuing more.`); return; }
+  const method=prompt(`Issue ${money(amount)} to ${who}.\n\nType "cash" or "eft":`,'cash');
+  if(method===null) return;
+  const m=(method||'').trim().toLowerCase();
+  if(m!=='cash'&&m!=='eft'){ toast('Type either cash or eft.'); return; }
+  const { error } = await sb.rpc('issue_advance',{ p_id:id, p_method:m, p_remarks:null });
+  if(error){ toast('Could not issue: '+explain(error)); return; }
+  await audit('petty.issue','advance',id,`Issued ${money(amount)} petty cash to ${who} (${m})`,{amount, method:m});
+  toast('Issued — awaiting their confirmation'); await refresh(); renderPettyFinance();
+}
+async function amountOwedBy(empId){
+  const { data, error } = await sb.rpc('debt_balance',{ p_employee_id:empId });
+  if(error) return 0;
+  const row = Array.isArray(data)? data[0] : data;
+  return row ? Number(row.owed||0) : 0;
+}
+async function refundOverspend(advanceId){
+  const a=pcAdvRows.find(x=>Number(x.advance_id)===advanceId); if(!a){ toast('Reload and try again.'); return; }
+  const remaining=Number(a.remaining||0);
+  if(remaining >= -0.005){ toast('Nothing to refund — this advance is not overspent.'); return; }
+  const amount=Math.round(-remaining*100)/100;
+  if(!confirm(`${a.employee_name} overspent this ${money(a.amount)} advance by ${money(amount)}.\n\nThis raises a ${money(amount)} reimbursement through the payment run and closes the advance. Proceed?`)) return;
+  const { error } = await sb.rpc('refund_overspend',{ p_advance_id:advanceId });
+  if(error){ toast('Could not raise refund: '+explain(error)); return; }
+  await audit('petty.refund','advance',advanceId,`Raised a ${money(amount)} reimbursement to ${a.employee_name} for overspend on advance #${advanceId}`,{amount});
+  toast(`Reimbursement of ${money(amount)} raised — it will flow through Payments`); await refresh(); renderPettyFinance();
+}
+async function declineAdvance(id){
+  const a=pcAdvRows.find(x=>Number(x.advance_id)===id) || allAdvances.find(x=>x.id===id); if(!a) return;
+  const who=a.employee_name||nameOf(a.employee_id);
+  const why=prompt('Reason for declining:'); if(why===null) return;
+  const { error } = await sb.rpc('decline_advance',{ p_id:id, p_remarks:why });
+  if(error){ toast('Could not decline: '+explain(error)); return; }
+  await audit('petty.decline','advance',id,`Declined ${who}'s advance request of ${money(a.amount)}`,{reason:why});
+  toast('Declined'); await refresh(); renderPettyFinance();
+}
+async function closeFloat(advanceId){
+  const a=pcAdvRows.find(x=>Number(x.advance_id)===advanceId); if(!a){ toast('Reload and try again.'); return; }
+  const expected=Number(a.remaining||0); const who=a.employee_name;
+  const raw=prompt(`Close out ${who}'s ${money(a.amount)} advance (${a.reason||'—'}).\n\nThey should be holding ${money(expected)}.\nHow much cash did they actually return? (R)`, String(expected.toFixed(2)));
+  if(raw===null) return;
+  const returned=parseFloat(raw); if(isNaN(returned)||returned<0){ toast('Enter a valid amount.'); return; }
+  const variance=Math.round((expected-returned)*100)/100;
+  let recvDate=null, ref=null;
+  if(returned>0.005){
+    recvDate=prompt('Date the cash was received back (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+    if(recvDate===null) return;
+    ref=prompt('Reference for the returned cash (deposit slip no., EFT reference, or a note). Leave blank if none:');
+    if(ref===null) return;
+  }
+  let remarks=null;
+  if(Math.abs(variance)>0.005){
+    remarks=prompt(`There is a shortfall of ${money(variance)}. It will be recorded as owed by ${who} until repaid.\n\nExplain the difference:`);
+    if(remarks===null) return;
+  }
+  const { error } = await sb.rpc('close_float',{ p_advance_id:advanceId, p_returned:returned, p_remarks:remarks, p_received_date:recvDate, p_reference:(ref&&ref.trim())?ref.trim():null });
+  if(error){ toast('Could not close: '+explain(error)); return; }
+  await audit('petty.closeout','advance',advanceId,`Closed ${who}'s ${money(a.amount)} advance — expected ${money(expected)}, returned ${money(returned)}, variance ${money(variance)}`,{advance_id:advanceId, expected, returned, variance, remarks, received_date:recvDate, reference:ref});
+  toast(Math.abs(variance)>0.005?`Closed — ${money(variance)} now recorded as owed`:'Closed and balanced'); await refresh(); renderPettyFinance();
+}
+
+// ===== Petty cash drill-in =====
+function pcDrillExpenses(list){
+  if(!list.length) return '<p class="hint" style="margin:4px 0 14px">None.</p>';
+  return '<table style="margin-bottom:14px"><thead><tr><th>Date</th><th>Detail</th><th class="r">Amount</th><th>Status</th><th>Submitted</th></tr></thead><tbody>'+
+    list.map(e=>`<tr><td>${fmtDate(e.claim_date)}</td><td>${e.vendor||'—'}${e.category?' · <span class="meta">'+e.category+'</span>':''}</td><td class="r num">${money(e.amount)}</td><td>${e.state==='accounted'?'<span class="chip approved" style="text-transform:none">Approved</span>':'<span class="chip neutral" style="text-transform:none">Pending</span>'}</td><td class="meta">${fmtDateTime(e.submitted_at)}</td></tr>`).join('')+
+    '</tbody></table>';
+}
+function pcAdvanceBlock(a, exp, autoOpen){
+  const chip=`<span class="chip ${(a.status==='confirmed'||a.status==='closed')?'approved':(a.status==='declined'?'rejected':'neutral')}" style="text-transform:none">${ADV_LABEL[a.status]||a.status}</span>`;
+  const when = a.confirmed_date?('Confirmed '+fmtDateTime(a.confirmed_date)) : (a.issued_date?('Issued '+fmtDateTime(a.issued_date)) : ('Requested '+fmtDateTime(a.requested_date)));
+  const head = `${money(a.amount)} · ${a.method==='eft'?'EFT':'Cash'} · ${when}`;
+  const related=exp.filter(e=>String(e.advance_id)===String(a.id));
+  const acc=Number(a.accounted||0), awa=Number(a.awaiting||0), rem=Number(a.remaining!=null?a.remaining:(Number(a.amount)-acc));
+  const expandable = related.length>0 || a.status==='confirmed' || a.status==='closed';
+  const sub = (a.status==='requested'||a.status==='issued'||a.status==='declined')
+    ? (a.reason||'—')
+    : `${a.reason||'—'} · accounted ${money(acc)}${awa>0.005?' · awaiting '+money(awa):''} · ${rem<0?'overspent '+money(-rem):'remaining '+money(rem)}`;
+  if(!expandable){
+    return `<div class="claim" data-advid="${a.id}" style="margin-bottom:8px"><div class="claim-top"><div>
+      <div class="vendor">${head}</div><div class="meta">${sub}</div>${a.remarks?'<div class="meta">Note: '+a.remarks+'</div>':''}
+      </div>${chip}</div></div>`;
+  }
+  return `<details class="pc-adv" data-advid="${a.id}" style="margin-bottom:8px"${autoOpen?' open':''}>
+    <summary style="cursor:pointer;list-style:none;outline:none">
+      <div class="claim" style="margin:0"><div class="claim-top"><div>
+        <div class="vendor">${head} <span class="meta">▸</span></div>
+        <div class="meta">${sub}${related.length?' · '+related.length+' item'+(related.length===1?'':'s'):''}</div>
+        ${a.remarks?'<div class="meta">Note: '+a.remarks+'</div>':''}
+      </div>${chip}</div></div>
+    </summary>
+    <div style="padding:8px 0 2px 10px">${related.length?pcDrillExpenses(related):'<p class="hint" style="margin:2px 0 12px">No expenses captured against this advance yet.</p>'}</div>
+  </details>`;
+}
+function pcDrillCloseouts(list){
+  if(!list.length) return '';
+  return '<h3 style="font-size:14px;margin:20px 0 8px">Close-outs</h3><table style="margin-bottom:14px"><thead><tr><th>Closed</th><th class="r">Expected</th><th class="r">Returned</th><th class="r">Variance</th><th>Received</th><th>Reference</th></tr></thead><tbody>'+
+    list.map(c=>`<tr><td class="meta">${fmtDateTime(c.closed_date)}</td><td class="r num">${money(c.expected)}</td><td class="r num">${money(c.returned)}</td><td class="r num" style="color:${Number(c.variance)>0.005?'var(--flag)':'var(--muted)'}">${money(c.variance)}</td><td class="meta">${c.received_date?fmtDate(c.received_date):'—'}</td><td class="meta">${c.reference||'—'}</td></tr>`).join('')+
+    '</tbody></table>';
+}
+function pcDrillRepayments(list){
+  if(!list.length) return '';
+  return '<h3 style="font-size:14px;margin:20px 0 8px">Repayments received</h3><table style="margin-bottom:14px"><thead><tr><th>Received</th><th class="r">Amount</th><th>Into account</th><th>Reference</th><th>Recorded</th></tr></thead><tbody>'+
+    list.map(r=>`<tr><td class="meta">${r.received_date?fmtDate(r.received_date):'—'}</td><td class="r num">${money(r.amount)}</td><td class="meta">${r.received_account||'—'}</td><td class="meta">${r.reference||r.remarks||'—'}</td><td class="meta">${fmtDateTime(r.recorded_at)}</td></tr>`).join('')+
+    '</tbody></table>';
+}
+async function openPettyDrill(empId, focus){
+  const modal=$('#pcDrillModal'); const body=$('#pcDrillBody');
+  $('#pcDrillTitle').textContent = (empId===me.id?'Your petty cash':nameOf(empId)+' — petty cash');
+  body.innerHTML='<p class="hint"><span class="spinner"></span>Loading…</p>';
+  modal.classList.add('open');
+  const { data, error } = await sb.rpc('petty_detail',{ p_employee_id:empId });
+  if(error){ body.innerHTML='<p class="meta">Could not load detail: '+explain(error)+'</p>'; return; }
+  const d=data||{};
+  const exp=d.expenses||[]; const advs=d.advances||[];
+  const focusId = (focus && String(focus).startsWith('adv')) ? String(focus).slice(3) : null;
+  let h='<h3 style="font-size:14px;margin:6px 0 8px">Advances <span class="meta" style="font-weight:400">— tap one to see the expenses accounted against it</span></h3>';
+  h+= advs.length ? advs.map(a=>pcAdvanceBlock(a, exp, focusId && String(a.id)===focusId)).join('') : '<p class="hint" style="margin:4px 0 14px">No advances.</p>';
+  const orphan=exp.filter(e=>!e.advance_id);
+  if(orphan.length){ h+='<h3 style="font-size:14px;margin:22px 0 8px">Not linked to an advance</h3>'+pcDrillExpenses(orphan); }
+  h+=pcDrillCloseouts(d.closeouts||[]);
+  h+=pcDrillRepayments(d.repayments||[]);
+  body.innerHTML=h;
+  if(focusId){ const el=body.querySelector('[data-advid="'+focusId+'"]'); if(el) el.scrollIntoView({block:'start'}); }
+}
+function closePcDrill(){ $('#pcDrillModal').classList.remove('open'); }
+
+// ---- Manager team view ----
+let teamFilterEmp='all';
+async function renderPettyTeam(){
+  const box=$('#pcTeam');
+  box.innerHTML='<p class="hint"><span class="spinner"></span>Loading…</p>';
+  const { data, error } = await sb.rpc('petty_advances');
+  if(error){ box.innerHTML='<p class="meta">Could not load: '+explain(error)+'</p>'; return; }
+  pcAdvRows = data||[];
+  if(!pcAdvRows.length){ box.innerHTML='<div class="empty"><h3>No petty cash in your team</h3><p>Advances issued to your direct reports appear here, each drillable to the expenses accounted against it.</p></div>'; return; }
+  const emps=[...new Map(pcAdvRows.map(a=>[String(a.employee_id), a.employee_name])).entries()];
+  if(teamFilterEmp!=='all' && !emps.some(([id])=>id===String(teamFilterEmp))) teamFilterEmp='all';
+  const rows=pcAdvRows.filter(a=>teamFilterEmp==='all' || String(a.employee_id)===String(teamFilterEmp));
+  let h='<div style="margin:8px 0 14px">Show: <select id="pcTeamFilter" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px"><option value="all">Everyone</option>'+
+    emps.map(([id,nm])=>`<option value="${id}"${String(teamFilterEmp)===id?' selected':''}>${nm}</option>`).join('')+'</select></div>';
+  h+='<table><thead><tr><th>Person</th><th>For</th><th class="r">Advanced</th><th class="r">Accounted</th><th class="r">Awaiting</th><th class="r">Remaining</th><th>Status</th><th></th></tr></thead><tbody>';
+  rows.forEach(a=>{ const rem=Number(a.remaining||0);
+    h+=`<tr><td>${a.employee_name}${a.closeout_requested?' <span class="chip flag" style="text-transform:none">wants to close</span>':''}</td><td>${a.reason||'—'}</td><td class="r num">${money(a.amount)}</td><td class="r num">${money(a.accounted)}</td><td class="r num">${money(a.awaiting)}</td><td class="r num" style="color:${rem<0?'var(--flag)':'var(--ink)'}">${money(rem)}</td><td><span class="chip ${(a.status==='confirmed'||a.status==='closed')?'approved':(a.status==='declined'?'rejected':'neutral')}" style="text-transform:none">${ADV_LABEL[a.status]||a.status}</span></td><td class="r"><button class="btn-sm" data-pcviewadv="${a.advance_id}" data-emp="${a.employee_id}">View…</button></td></tr>`; });
+  h+='</tbody></table>';
+  box.innerHTML=h;
+  const f=$('#pcTeamFilter'); if(f) f.onchange=()=>{ teamFilterEmp=f.value; renderPettyTeam(); };
+  box.querySelectorAll('[data-pcviewadv]').forEach(b=>b.onclick=()=>openPettyDrill(Number(b.dataset.emp),'adv'+b.dataset.pcviewadv));
+}
+
+
+// ===== Dashboard (Managers / Directors) =====
+let dashLens='centres', dashPeriod='year';
+const dashCharts={};
+const DASH_PALETTE=['#0d9488','#14b8a6','#2dd4bf','#5eead4','#0f766e','#115e59','#99f6e4','#134e4a','#5b6b6a','#b45309'];
+function dashPeriodRange(p){ const now=new Date(), y=now.getFullYear();
+  if(p==='month'){ const m=now.getMonth(); const iso=d=>d.toISOString().slice(0,10); return [iso(new Date(y,m,1)), iso(new Date(y,m+1,0))]; }
+  if(p==='year') return [`${y}-01-01`,`${y}-12-31`];
+  return [null,null];
+}
+function dashStat(val,lbl){ return `<div class="dash-stat"><div class="val">${val}</div><div class="lbl">${lbl}</div></div>`; }
+function dashAgg(rows,field){ const o={}; rows.forEach(t=>{ const k=t[field]||'(none)'; o[k]=(o[k]||0)+Number(t.amount||0); }); return o; }
+function drawChart(id,cfg){ if(typeof Chart==='undefined') return; if(dashCharts[id]) dashCharts[id].destroy(); const el=document.getElementById(id); if(el) dashCharts[id]=new Chart(el,cfg); }
+function destroyDashCharts(){ Object.keys(dashCharts).forEach(k=>{ if(dashCharts[k]){ dashCharts[k].destroy(); delete dashCharts[k]; } }); }
+async function renderDashboard(){
+  const isMgr = me.role==='Manager';
+  const ctl=$('#dashControls'); ctl.innerHTML='';
+  const group=(items,active,cb)=>items.forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; if(k===active) b.className='active'; b.onclick=()=>cb(k); ctl.appendChild(b); });
+  if(isMgr){ group([['centres','My centres'],['team','My team']], dashLens, k=>{ dashLens=k; renderDashboard(); }); const sep=document.createElement('span'); sep.style.cssText='display:inline-block;width:20px'; ctl.appendChild(sep); }
+  group([['month','This month'],['year','This year'],['all','All time']], dashPeriod, k=>{ dashPeriod=k; renderDashboard(); });
+
+  let q=sb.from('transactions').select('*').neq('status','draft');
+  const [from,to]=dashPeriodRange(dashPeriod);
+  if(from) q=q.gte('claim_date',from); if(to) q=q.lte('claim_date',to);
+  if(me.role!=='Director'){
+    if(dashLens==='centres'){ const c=myCentres(); if(!c.length){ return dashEmpty('You have no profit centres assigned yet.'); } q=q.in('profit_center',c); }
+    else { const r=Object.values(userMap).filter(u=>String(u.manager_id)===String(me.id)).map(u=>u.id); if(!r.length){ return dashEmpty('You have no direct reports yet.'); } q=q.in('employee_id',r); }
+  }
+  const { data:txns, error } = await q;
+  if(error){ return dashEmpty('Could not load: '+explain(error)); }
+  const rows=txns||[];
+  const total=rows.reduce((s,t)=>s+Number(t.amount||0),0);
+  const paid=rows.filter(t=>(t.status||'').toLowerCase()==='reconciled').reduce((s,t)=>s+Number(t.amount||0),0);
+  $('#dashStats').innerHTML = dashStat(money(total),'Total claimed')+dashStat(rows.length,'Claims')+dashStat(money(total-paid),'In progress')+dashStat(money(paid),'Paid');
+  if(!rows.length){ $('#dashMsg').innerHTML='<div class="empty"><h3>No claims in this period</h3><p>Try a wider period, or switch view.</p></div>'; $('#dashCharts').style.display='none'; destroyDashCharts(); return; }
+  $('#dashMsg').innerHTML=''; $('#dashCharts').style.display='grid';
+  const byCat=dashAgg(rows,'category'), byPc=dashAgg(rows,'profit_center');
+  const byEmp={}; rows.forEach(t=>{ byEmp[t.employee_id]=(byEmp[t.employee_id]||0)+Number(t.amount||0); });
+  const topEmp=Object.keys(byEmp).sort((a,b)=>byEmp[b]-byEmp[a]).slice(0,8);
+  drawChart('chartCategory',{ type:'doughnut', data:{ labels:Object.keys(byCat), datasets:[{ data:Object.values(byCat), backgroundColor:DASH_PALETTE }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } } });
+  drawChart('chartCentre',{ type:'bar', data:{ labels:Object.keys(byPc), datasets:[{ data:Object.values(byPc), backgroundColor:DASH_PALETTE[0] }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } });
+  drawChart('chartEmployee',{ type:'bar', data:{ labels:topEmp.map(id=>nameOf(Number(id))), datasets:[{ data:topEmp.map(id=>byEmp[id]), backgroundColor:DASH_PALETTE[1] }] }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ beginAtZero:true } } } });
+}
+function dashEmpty(msg){ $('#dashStats').innerHTML=''; $('#dashMsg').innerHTML=`<div class="empty"><h3>Nothing to show</h3><p>${msg}</p></div>`; $('#dashCharts').style.display='none'; destroyDashCharts(); }
+
+// ===== Reports — export captured expenses (Finance / Directors) =====
+const STATUS_LABEL = { draft:'Draft', pending_approval:'Awaiting approval', batched:'Batched', exported:'Sent for payment', reconciled:'Payment successful' };
+function renderReports(){
+  const pc=$('#rep-pc'); if(pc){ pc.innerHTML='<option value="">All centres</option>'+profitCentres.map(p=>`<option value="${p}">${p}</option>`).join(''); }
+  $('#repCount').textContent=''; $('#repPreview').innerHTML='';
+}
+async function reportRows(){
+  let q = sb.from('transactions').select('*').order('claim_date',{ascending:true});
+  const from=$('#rep-from').value, to=$('#rep-to').value, status=$('#rep-status').value, pc=$('#rep-pc').value;
+  if(from) q=q.gte('claim_date',from);
+  if(to) q=q.lte('claim_date',to);
+  if(status) q=q.eq('status',status);
+  if(pc) q=q.eq('profit_center',pc);
+  const { data:txns, error } = await q;
+  if(error){ toast('Could not load: '+explain(error)); return null; }
+  if(!txns || !txns.length) return [];
+  // resolve batch + payment references
+  const txnIds=txns.map(t=>t.id);
+  const { data:batches } = await sb.from('batches').select('id,transaction_ids,profit_center');
+  const { data:exps } = await sb.from('payment_exports').select('export_reference,bank_payment_reference,date_paid,batch_ids,status');
+  const batchOf={}, payOf={};
+  (batches||[]).forEach(b=>{ (b.transaction_ids||[]).forEach(tid=>{ batchOf[tid]=b.id;
+    // find the export covering this batch
+    (exps||[]).forEach(e=>{ if((e.batch_ids||[]).includes(b.id)){ payOf[tid]={ ref:e.bank_payment_reference, paid:e.date_paid, exp:e.export_reference }; } }); }); });
+  return txns.map(t=>{ const u=userMap[t.employee_id]||{}; const pay=payOf[t.id]||{};
+    return {
+      'Claim date': t.claim_date||'',
+      'Employee': `${u.name||''} ${u.surname||''}`.trim(),
+      'Employee number': u.employee_number||'',
+      'Profit centre': t.profit_center||'',
+      'Category': t.category||'',
+      'Vendor': t.vendor||'',
+      'Description': t.description||'',
+      'Amount': Number(t.amount||0).toFixed(2),
+      'Status': STATUS_LABEL[(t.status||'').toLowerCase()]||t.status||'',
+      'Batch reference': batchOf[t.id]?('BATCH-'+batchOf[t.id]):'',
+      'Payment reference': pay.ref||'',
+      'Date paid': pay.paid||''
+    }; });
+}
+async function reportPreview(){
+  $('#repPreview').innerHTML='<p class="hint"><span class="spinner"></span>Loading…</p>';
+  const rows=await reportRows(); if(rows===null){ $('#repPreview').innerHTML=''; return; }
+  window._repRows=rows;
+  $('#repCount').textContent = `${rows.length} transaction${rows.length===1?'':'s'}`;
+  if(!rows.length){ $('#repPreview').innerHTML='<div class="empty"><h3>No transactions</h3><p>Nothing matches those filters.</p></div>'; return; }
+  const total=rows.reduce((s,r)=>s+Number(r.Amount||0),0);
+  const cols=Object.keys(rows[0]);
+  let h='<div style="overflow-x:auto"><table><thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  rows.slice(0,100).forEach(r=>{ h+='<tr>'+cols.map(c=>`<td>${c==='Amount'?money(Number(r[c])):(r[c]||'—')}</td>`).join('')+'</tr>'; });
+  h+='</tbody></table></div>';
+  if(rows.length>100) h+='<p class="hint">Showing first 100 rows — the download includes all '+rows.length+'.</p>';
+  h+=`<p class="meta" style="margin-top:10px">Total: <b>${money(total)}</b></p>`;
+  $('#repPreview').innerHTML=h;
+}
+async function reportExport(kind){
+  const rows = window._repRows && window._repRows.length ? window._repRows : await reportRows();
+  if(rows===null) return;
+  if(!rows || !rows.length){ toast('Nothing to export — adjust the filters.'); return; }
+  const stamp=new Date().toISOString().slice(0,10);
+  if(kind==='csv'){
+    const cols=Object.keys(rows[0]);
+    const esc=v=>{ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+    const csv=[cols.join(',')].concat(rows.map(r=>cols.map(c=>esc(r[c])).join(','))).join('\r\n');
+    downloadFile(`ClaimFlow-expenses-${stamp}.csv`, csv);
+  } else {
+    if(typeof XLSX==='undefined'){ toast('The spreadsheet library is still loading — try again in a moment.'); return; }
+    const ws=XLSX.utils.json_to_sheet(rows);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
+    XLSX.writeFile(wb, `ClaimFlow-expenses-${stamp}.xlsx`);
+  }
+  await audit('report.export','report',null,`Exported expenses report (${kind.toUpperCase()}) — ${rows.length} rows`,{kind, rows:rows.length});
+}
+
+function renderTeam(){
+  const box=$('#teamList'); if(!box) return;
+  const reports = Object.values(userMap).filter(u=>String(u.manager_id)===String(me.id) && (u.status||'').toLowerCase()==='approved');
+  if(!reports.length){ box.innerHTML='<div class="empty"><h3>No direct reports</h3><p>People who report to you appear here.</p></div>'; return; }
+  box.innerHTML='';
+  reports.forEach(u=>{ const pending = deactRequests.find(r=>r.user_id===u.id && (r.status||'')==='pending');
+    const card=document.createElement('div'); card.className='claim';
+    let inner=`<div class="claim-top"><div><div class="vendor">${u.name} ${u.surname}</div>
+      <div class="meta">${u.role||'Employee'} · ${u.department||'—'} · ${u.email||''}</div></div>
+      <div></div><span class="chip ${pending?'flag':'approved'}">${pending?'Deactivation requested':'Active'}</span></div>`;
+    if(pending) inner+=`<div class="meta" style="margin-top:6px">Requested ${fmtDateTime(pending.created_date)} — awaiting HR.${pending.reason?' Reason: '+pending.reason:''}</div>`;
+    else inner+=`<div class="claim-actions"><button class="btn-sm btn-del" data-deact="${u.id}">Request deactivation</button></div>`;
+    card.innerHTML=inner; box.appendChild(card); });
+  box.querySelectorAll('[data-deact]').forEach(b=>b.onclick=()=>requestDeactivation(Number(b.dataset.deact)));
+}
+async function requestDeactivation(userId){
+  const u=userMap[userId]; if(!u) return;
+  const reason=prompt(`Request HR to deactivate ${u.name} ${u.surname}? Enter a reason:`); if(reason===null) return;
+  const { error } = await sb.from('deactivation_requests').insert({ user_id:userId, requested_by:me.id, reason:reason||null, status:'pending', created_date:new Date().toISOString() });
+  if(error){ toast('Could not submit: '+explain(error)); return; }
+  await audit('user.deactivation_request','user',userId,`${me.name} ${me.surname} requested deactivation of ${u.name} ${u.surname}`,{reason});
+  toast('Deactivation request sent to HR'); await refresh(); renderTeam();
+}
+function renderDeactRequests(){
+  const box=$('#hrDeactivations'); if(!box) return;
+  const pending = deactRequests.filter(r=>(r.status||'')==='pending');
+  if(!pending.length){ box.innerHTML=''; return; }
+  let h='<div class="batch flagged" style="margin-bottom:18px"><div class="batch-head" style="cursor:default"><div><div class="who">Deactivation requests</div><div class="meta">'+pending.length+' request'+(pending.length===1?'':'s')+' from line managers awaiting your action</div></div><div></div><span class="chip flag">Action needed</span></div><div class="body open">';
+  h+='<table><thead><tr><th>Employee</th><th>Requested by</th><th>Reason</th><th></th></tr></thead><tbody>';
+  pending.forEach(r=>{ const u=userMap[r.user_id];
+    h+=`<tr><td>${u?u.name+' '+u.surname:'User #'+r.user_id}</td><td>${nameOf(r.requested_by)}<div class="meta">${fmtDate(r.created_date)}</div></td><td>${r.reason||'—'}</td><td class="r"><button class="btn-sm btn-del" data-deactok="${r.id}">Deactivate</button> <button class="btn-sm btn-edit" data-deactno="${r.id}">Decline</button></td></tr>`; });
+  h+='</tbody></table></div></div>';
+  box.innerHTML=h;
+  box.querySelectorAll('[data-deactok]').forEach(b=>b.onclick=()=>actionDeactivation(Number(b.dataset.deactok), true));
+  box.querySelectorAll('[data-deactno]').forEach(b=>b.onclick=()=>actionDeactivation(Number(b.dataset.deactno), false));
+}
+async function actionDeactivation(reqId, approve){
+  const r=deactRequests.find(x=>x.id===reqId); if(!r) return;
+  const u=userMap[r.user_id];
+  if(approve){
+    if(!confirm(`Deactivate ${u?u.name+' '+u.surname:'this user'}? They will no longer be able to sign in. Their history is kept.`)) return;
+    const { error:ue } = await sb.from('users').update({ status:'inactive' }).eq('id',r.user_id);
+    if(ue){ toast('Could not deactivate: '+explain(ue)); return; }
+    await sb.from('deactivation_requests').update({ status:'approved', actioned_by:me.id, actioned_date:new Date().toISOString() }).eq('id',reqId);
+    await audit('user.deactivate','user',r.user_id,`Deactivated ${u?u.name+' '+u.surname:'user #'+r.user_id} (requested by ${nameOf(r.requested_by)})`,{reason:r.reason});
+    toast('Account deactivated');
+  } else {
+    const remarks=prompt('Reason for declining this deactivation request (optional):')||'';
+    await sb.from('deactivation_requests').update({ status:'declined', actioned_by:me.id, actioned_date:new Date().toISOString(), hr_remarks:remarks }).eq('id',reqId);
+    await audit('user.deactivation_decline','user',r.user_id,`Declined deactivation of ${u?u.name+' '+u.surname:'user #'+r.user_id}`,{remarks});
+    toast('Request declined');
+  }
+  await refresh(); renderHR();
+}
+function renderRatesList(){
+  const box=$('#ratesList'); if(!box) return;
+  if(!mileageRates.length){ box.innerHTML='<p class="meta">No rates set yet — add the first one below.</p>'; return; }
+  box.innerHTML='';
+  mileageRates.forEach(r=>{ const active=(r.status||'active')==='active';
+    const row=document.createElement('div'); row.className='claim';
+    row.innerHTML=`<div class="claim-top"><div><div class="vendor">${money(r.rate_amount)} per km</div>
+      <div class="meta">Effective from ${fmtDate(r.effective_date)}${r.notes?' · '+r.notes:''}</div></div>
+      <div></div><span class="chip ${active?'approved':'neutral'}">${r.status||'active'}</span></div>
+      <div class="claim-actions"><button class="btn-sm btn-edit" data-editrate="${r.id}">Edit</button></div>`;
+    box.appendChild(row); });
+  box.querySelectorAll('[data-editrate]').forEach(b=>b.onclick=()=>openRateEdit(Number(b.dataset.editrate)));
+}
+async function addRate(){
+  const date=$('#rate-date').value, amt=parseFloat($('#rate-amt').value), notes=$('#rate-notes').value.trim();
+  if(!date||!amt||amt<=0){ toast('Enter an effective date and a valid rate.'); return; }
+  const { error } = await sb.from('mileage_rates').insert({ effective_date:date, rate_amount:amt, status:'active', created_date:new Date().toISOString(), notes:notes||null });
+  if(error){ toast('Could not add: '+explain(error)); return; }
+  await audit('config.mileage_rate_add','mileage_rate',null,`Added mileage rate ${money(amt)}/km effective ${fmtDate(date)}`,{effective_date:date, rate_amount:amt, notes});
+  toast('Rate added'); $('#rate-date').value=''; $('#rate-amt').value=''; $('#rate-notes').value='';
+  await refresh(); renderAdmin();
+}
+function openRateEdit(id){ const r=mileageRates.find(x=>x.id===id); if(!r) return; rateEditing=r;
+  $('#er-date').value=r.effective_date; $('#er-amt').value=r.rate_amount; $('#er-status').value=r.status||'active'; $('#er-notes').value=r.notes||'';
+  $('#rateModal').classList.add('open'); }
+function closeRateEdit(){ $('#rateModal').classList.remove('open'); rateEditing=null; }
+async function saveRateEdit(){ const r=rateEditing; if(!r) return;
+  const date=$('#er-date').value, amt=parseFloat($('#er-amt').value), status=$('#er-status').value, notes=$('#er-notes').value.trim();
+  if(!date||!amt||amt<=0){ toast('Enter a valid date and rate.'); return; }
+  const changes=[];
+  if(String(r.effective_date)!==String(date)) changes.push(`effective ${fmtDate(r.effective_date)} → ${fmtDate(date)}`);
+  if(Number(r.rate_amount)!==amt) changes.push(`rate ${money(r.rate_amount)} → ${money(amt)}`);
+  if((r.status||'active')!==status) changes.push(`status ${r.status||'active'} → ${status}`);
+  const { error } = await sb.from('mileage_rates').update({ effective_date:date, rate_amount:amt, status, notes:notes||null }).eq('id',r.id);
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  await audit('config.mileage_rate_edit','mileage_rate',r.id,`Edited mileage rate #${r.id}: ${changes.join(', ')||'notes only'}`,{changes});
+  toast('Rate updated'); closeRateEdit(); await refresh(); renderAdmin();
+}
+function centreAcctBadge(c){
+  if(!c.from_account) return '';
+  const s=(c.account_status||'').toLowerCase();
+  if(s==='approved') return ' · <span style="color:var(--ok)">account approved</span>';
+  if(s==='rejected') return ' · <span style="color:var(--reject)">account rejected</span>';
+  return ' · <span style="color:var(--pending)">account awaiting Finance approval</span>';
+}
+function renderCentresList(){
+  const box=$('#centresList'); if(!box) return;
+  if(!allCentres.length){ box.innerHTML='<p class="meta">No profit centres yet — add the first one below.</p>'; return; }
+  box.innerHTML='';
+  allCentres.forEach(c=>{ const active=(c.status||'active')==='active';
+    const row=document.createElement('div'); row.className='claim';
+    row.innerHTML=`<div class="claim-top"><div><div class="vendor">${c.code}</div>
+      <div class="meta">${c.name||'(no name set)'} · paying account: ${c.from_account||'not set'}${centreAcctBadge(c)}</div></div>
+      <div></div><span class="chip ${active?'approved':'neutral'}">${c.status||'active'}</span></div>
+      <div class="claim-actions"><button class="btn-sm btn-edit" data-editpc="${c.id}">Edit</button></div>`;
+    box.appendChild(row); });
+  box.querySelectorAll('[data-editpc]').forEach(b=>b.onclick=()=>openPcEdit(Number(b.dataset.editpc)));
+}
+async function addCentre(){
+  const code=$('#pc-code').value.trim(), name=$('#pc-name').value.trim(), acc=$('#pc-account').value.trim();
+  if(!code){ toast('Enter a profit-centre code.'); return; }
+  const { error } = await sb.from('profit_centres').insert({ code, name:name||null, from_account:acc||null, account_status: acc?'pending':null, status:'active', created_date:new Date().toISOString() });
+  if(error){ toast(explain(error).toLowerCase().includes('duplicate')||explain(error).toLowerCase().includes('unique')?'That code already exists.':'Could not add: '+explain(error)); return; }
+  await audit('config.centre_add','profit_centre',null,`Added profit centre ${code}${acc?' with paying account (awaiting Finance approval)':''}`,{code, name, from_account:acc});
+  toast(acc?'Added — the paying account needs Finance approval':'Profit centre added'); $('#pc-code').value=''; $('#pc-name').value=''; $('#pc-account').value='';
+  await refresh(); renderAdmin();
+}
+function openPcEdit(id){ const c=allCentres.find(x=>x.id===id); if(!c) return; pcEditing=c;
+  $('#epc-code').value=c.code||''; $('#epc-name').value=c.name||''; $('#epc-account').value=c.from_account||''; $('#epc-status').value=c.status||'active';
+  $('#pcModal').classList.add('open'); }
+function closePcEdit(){ $('#pcModal').classList.remove('open'); pcEditing=null; }
+async function savePcEdit(){ const c=pcEditing; if(!c) return;
+  const code=$('#epc-code').value.trim(), name=$('#epc-name').value.trim(), acc=$('#epc-account').value.trim(), status=$('#epc-status').value;
+  if(!code){ toast('Enter a code.'); return; }
+  const changes=[]; const accChanged = (c.from_account||'')!==acc;
+  if(c.code!==code) changes.push(`code ${c.code} → ${code}`);
+  if((c.name||'')!==name) changes.push(`name → ${name||'(blank)'}`);
+  if(accChanged) changes.push(`paying account → ${acc||'(blank)'}`);
+  if((c.status||'active')!==status) changes.push(`status ${c.status||'active'} → ${status}`);
+  const upd={ code, name:name||null, from_account:acc||null, status };
+  // if the paying account changed, it must be re-approved by Finance
+  if(accChanged){ upd.account_status = acc?'pending':null; upd.account_approved_by=null; upd.account_approved_date=null; upd.account_remarks=null; }
+  const { error } = await sb.from('profit_centres').update(upd).eq('id',c.id);
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  await audit('config.centre_edit','profit_centre',c.id,`Edited profit centre #${c.id}: ${changes.join(', ')||'no change'}${accChanged&&acc?' (paying account now awaiting Finance approval)':''}`,{changes});
+  toast(accChanged&&acc?'Saved — the new paying account needs Finance approval':'Profit centre updated'); closePcEdit(); await refresh(); renderAdmin();
+}
+
+// ===== audit log view =====
+const AUDIT_CATS = { 'All':null, 'Claims':'claim.', 'Approvals':'batch.', 'Payments':'payment.', 'Accounts':'user.', 'Config':'config.', 'Sessions':'auth.' };
+const AUDIT_CAT_OF = a => a.startsWith('claim.')?'Claims':a.startsWith('batch.')?'Approvals':a.startsWith('payment.')?'Payments':a.startsWith('user.')?'Accounts':a.startsWith('config.')?'Config':a.startsWith('auth.')?'Sessions':'Other';
+let auditRows=[], auditCat='All';
+async function renderAudit(){
+  const list=$('#auditList'); list.innerHTML='<p class="hint"><span class="spinner"></span>Loading the audit trail…</p>';
+  const { data:rows, error } = await sb.from('audit_log').select('*').order('id',{ascending:false}).limit(300);
+  if(error){ list.innerHTML='<p class="hint" style="color:var(--reject)">Could not load: '+explain(error)+'</p>'; return; }
+  auditRows=rows||[];
+  $('#auditVerify').innerHTML=`<button class="btn-sm btn-edit" id="auditVerifyBtn">Verify the chain</button> <span id="auditVerifyOut" class="meta"></span>`;
+  $('#auditVerifyBtn').onclick=async()=>{ const out=$('#auditVerifyOut'); out.innerHTML='<span class="spinner"></span>Checking every entry…';
+    const r=await verifyAuditChain();
+    if(r.ok) out.innerHTML=`<span style="color:var(--ok)">✓ Chain intact — ${r.count} entr${r.count===1?'y':'ies'} verified, none altered.</span>`;
+    else out.innerHTML=`<span style="color:var(--reject)">⚠ Chain broken at entry #${r.brokenAt||'?'} — ${r.reason}.</span>`; };
+  const cats=Object.keys(AUDIT_CATS); if(!cats.includes(auditCat)) auditCat='All';
+  const fbox=$('#auditFilter'); fbox.innerHTML='';
+  cats.forEach(c=>{ const b=document.createElement('button'); b.textContent=c; if(c===auditCat) b.className='active'; b.onclick=()=>{ auditCat=c; renderAudit(); }; fbox.appendChild(b); });
+  const rowsF = auditRows.filter(e=> auditCat==='All' || AUDIT_CAT_OF(e.action)===auditCat);
+  $('#auditCount').textContent = rowsF.length+(rowsF.length===1?' event':' events');
+  if(rowsF.length===0){ list.innerHTML='<div class="empty"><h3>No activity yet</h3><p>Actions across the app will appear here as they happen.</p></div>'; return; }
+  list.innerHTML='';
+  rowsF.forEach(e=>{ const cat=AUDIT_CAT_OF(e.action);
+    const card=document.createElement('div'); card.className='claim';
+    card.innerHTML=`<div class="claim-top"><div><div class="vendor">${e.summary||e.action}</div>
+      <div class="meta">${e.actor_name||'—'}${e.actor_role?' · '+e.actor_role:''} · ${fmtDateTime(e.ts)}</div></div>
+      <div></div><span class="chip neutral">${cat}</span></div>`;
+    list.appendChild(card); });
+}
+
+// ===== HR side =====
+let hrFilter='Pending', hrAllUsers=[];
+async function renderHR(){
+  const list=$('#hrList'); list.innerHTML='<p class="hint"><span class="spinner"></span>Loading accounts…</p>';
+  const { data:users, error } = await sb.from('users').select('*').order('created_at',{ascending:false});
+  if(error){ list.innerHTML='<p class="hint" style="color:var(--reject)">Could not load: '+explain(error)+'</p>'; return; }
+  hrAllUsers=users||[];
+  hrPendingCount=hrAllUsers.filter(u=>(u.status||'').toLowerCase()==='pending').length;
+  renderDeactRequests();
+
+  // status filter chips
+  const opts=['Pending','Approved','Rejected','All'];
+  if(!opts.includes(hrFilter)) hrFilter='Pending';
+  const fbox=$('#hrFilter'); fbox.innerHTML='';
+  opts.forEach(s=>{ const b=document.createElement('button'); b.textContent=s;
+    if(s===hrFilter) b.className='active'; b.onclick=()=>{ hrFilter=s; renderHR(); }; fbox.appendChild(b); });
+
+  const rows = hrAllUsers.filter(u=>{ const st=(u.status||'').toLowerCase();
+    if(hrFilter==='All') return true; return st===hrFilter.toLowerCase(); });
+  $('#hrCount').textContent=rows.length+(rows.length===1?' account':' accounts');
+  if(rows.length===0){ list.innerHTML='<div class="empty"><h3>None here</h3><p>No accounts with this status.</p></div>'; return; }
+
+  list.innerHTML='';
+  rows.forEach(u=>{ const st=(u.status||'').toLowerCase();
+    const chipCls = st==='approved'?'approved':(st==='rejected'?'rejected':'pending');
+    const chipTxt = st.charAt(0).toUpperCase()+st.slice(1);
+    const card=document.createElement('div'); card.className='claim';
+    let inner=`<div class="claim-top"><div><div class="vendor">${u.name} ${u.surname} <span style="font-weight:400;color:var(--muted);font-size:12.5px">· ${u.role||'Employee'}</span></div>
+      <div class="meta">${u.employee_number||'—'} · ${u.email} · ${u.department||'no dept'}</div></div>
+      <div></div><span class="chip ${chipCls}">${chipTxt}</span></div>
+      <div class="meta" style="margin-top:8px">Line manager: ${u.manager_id?nameOf(u.manager_id):'—'} · Bank: ${u.bank_name||'—'} ${u.bank_code||''} acc ${u.bank_account||'—'}</div>`;
+    if(st==='pending'){
+      inner+=`<div class="claim-actions"><button class="btn-sm btn-submit2" data-review="${u.id}">Review</button></div>`;
+    } else if(st==='approved'){
+      inner+=`<div class="decided">Approved by ${u.approved_by_hr_id?nameOf(u.approved_by_hr_id):'—'} on ${fmtDate(u.approved_date)}.${u.bank_confirmed===false?' <span style="color:var(--pending)">· Banking change awaiting employee confirmation</span>':''}</div>`;
+      inner+=`<div class="claim-actions"><button class="btn-sm btn-edit" data-edituser="${u.id}">Edit details</button></div>`;
+    } else if(st==='rejected'){
+      inner+=`<div class="rejected-note">Rejected by ${u.approved_by_hr_id?nameOf(u.approved_by_hr_id):'—'} on ${fmtDate(u.approved_date)}${u.rejection_remarks?' — '+u.rejection_remarks:''}.</div>`;
+    }
+    card.innerHTML=inner; list.appendChild(card); });
+  list.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>openHRReview(Number(b.dataset.review)));
+  list.querySelectorAll('[data-edituser]').forEach(b=>b.onclick=()=>openHREdit(Number(b.dataset.edituser)));
+}
+// HR: edit an existing user's record (maker-checker — changes are logged and sent to the employee)
+function managerOptions(selectedId){
+  const opts=Object.values(userMap).filter(u=>u.role==='Manager'||u.role==='Director');
+  return '<option value="">—</option>'+opts.map(u=>`<option value="${u.id}"${String(u.id)===String(selectedId)?' selected':''}>${u.name} ${u.surname} (${u.role})</option>`).join('');
+}
+function openHREdit(id){ const u=hrAllUsers.find(x=>x.id===id); if(!u) return; hrEditUser=u;
+  $('#he-name').value=u.name||''; $('#he-surname').value=u.surname||''; $('#he-dept').value=u.department||'';
+  $('#he-manager').innerHTML=managerOptions(u.manager_id);
+  $('#he-role').value=u.role||'Employee';
+  $('#he-bankname').value=u.bank_name||''; $('#he-bankcode').value=u.bank_code||''; $('#he-account').value=u.bank_account||'';
+  const mine = Object.keys(authorityMap).filter(pc=>authorityMap[pc].includes(u.id));
+  $('#he-centres').innerHTML=profitCentres.map(p=>`<label><input type="checkbox" class="he-centre" value="${p}"${mine.includes(p)?' checked':''}> ${p}</label>`).join('');
+  toggleHECentres();
+  $('#hrEditModal').classList.add('open');
+}
+function closeHREdit(){ $('#hrEditModal').classList.remove('open'); hrEditUser=null; }
+function toggleHECentres(){ $('#he-centres-wrap').style.display = $('#he-role').value==='Manager'?'block':'none'; }
+async function saveHREdit(){ const u=hrEditUser; if(!u) return;
+  const nv={ name:$('#he-name').value.trim(), surname:$('#he-surname').value.trim(), department:$('#he-dept').value.trim(),
+    manager_id:$('#he-manager').value?Number($('#he-manager').value):null, role:$('#he-role').value,
+    bank_name:$('#he-bankname').value.trim(), bank_code:$('#he-bankcode').value.trim(), bank_account:$('#he-account').value.trim() };
+  const labels={ name:'First name', surname:'Surname', department:'Department', manager_id:'Line manager', role:'Role', bank_name:'Bank name', bank_code:'Bank code', bank_account:'Account number' };
+  const disp=(f,v)=> f==='manager_id' ? (v?nameOf(v):'—') : (v===''||v==null?'—':String(v));
+  const changes=[];
+  for(const f in nv){ const oldV=(f==='manager_id')?(u.manager_id||null):(u[f]||''); const newV=(f==='manager_id')?(nv[f]||null):(nv[f]||'');
+    if(String(oldV)!==String(newV)) changes.push({field:labels[f], from:disp(f,oldV), to:disp(f,newV)}); }
+  if(changes.length===0){ toast('No changes to save.'); return; }
+  const bankChanged = changes.some(c=>['Bank name','Bank code','Account number'].includes(c.field));
+  const upd={...nv}; if(bankChanged) upd.bank_confirmed=false;
+  const { error } = await sb.from('users').update(upd).eq('id',u.id);
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  // resync manager authority
+  await sb.from('approval_authority').delete().eq('manager_id', u.id);
+  if(nv.role==='Manager'){ const centres=Array.from(document.querySelectorAll('.he-centre:checked')).map(c=>c.value);
+    if(centres.length){ await sb.from('approval_authority').upsert(centres.map(p=>({profit_center:p, manager_id:u.id})),{onConflict:'profit_center,manager_id'}); } }
+  // notify the employee + log
+  await sb.from('notifications').insert({ recipient_id:u.id, type:bankChanged?'bank_change':'detail_change',
+    message: bankChanged ? 'Your banking details were changed by HR. Please confirm the new account is correct — your payments are on hold until you do.' : 'HR updated your account details.',
+    details: JSON.stringify(changes), requires_bank_ack:bankChanged, acknowledged:false, created_at:new Date().toISOString() });
+  await audit('user.edit','user',u.id,`Edited ${u.name} ${u.surname}: ${changes.map(c=>c.field).join(', ')}${bankChanged?' (banking — held pending confirmation)':''}`,{changes, bankChanged});
+  toast(bankChanged?'Saved — employee must confirm the new account':'Saved — employee notified'); closeHREdit(); await refresh(); renderHR();
+}
+
+// ===== notifications (employee side) =====
+async function loadNotifications(){
+  if(!me) return;
+  const { data } = await sb.from('notifications').select('*').eq('recipient_id',me.id).eq('acknowledged',false).order('id',{ascending:false});
+  myNotifs = data||[];
+  const banner=$('#notifBanner');
+  if(myNotifs.length){ banner.style.display='block'; banner.textContent=`🔔 You have ${myNotifs.length} notification${myNotifs.length===1?'':'s'} to review — click to view.`; banner.onclick=showNotifications; }
+  else { banner.style.display='none'; }
+}
+function showNotifications(){ renderNotifList(); $('#notifModal').classList.add('open'); }
+function closeNotifications(){ $('#notifModal').classList.remove('open'); }
+function renderNotifList(){
+  const box=$('#notifList');
+  if(!myNotifs.length){ box.innerHTML='<div class="empty" style="padding:24px"><h3>All caught up</h3><p>No updates to review.</p></div>'; return; }
+  box.innerHTML='';
+  myNotifs.forEach(n=>{ let changes=[]; try{ changes=JSON.parse(n.details||'[]'); }catch(e){}
+    const rows=changes.map(c=>`<div class="meta">• ${c.field}: <b style="color:var(--ink)">${c.from}</b> → <b style="color:var(--ink)">${c.to}</b></div>`).join('');
+    const card=document.createElement('div'); card.className='claim';
+    card.innerHTML=`<div class="vendor" style="${n.requires_bank_ack?'color:var(--pending)':''}">${n.message}</div>
+      <div style="margin-top:8px">${rows}</div>
+      <div class="meta" style="margin-top:6px">${fmtDateTime(n.created_at)}</div>
+      <div class="claim-actions"><button class="btn-sm btn-submit2" data-ack="${n.id}">${n.requires_bank_ack?'Yes, this is my account':'Got it'}</button></div>`;
+    box.appendChild(card); });
+  box.querySelectorAll('[data-ack]').forEach(b=>b.onclick=()=>acknowledgeNotif(Number(b.dataset.ack)));
+}
+async function acknowledgeNotif(id){
+  const n=myNotifs.find(x=>x.id===id); if(!n) return;
+  const { error } = await sb.from('notifications').update({ acknowledged:true, acknowledged_at:new Date().toISOString() }).eq('id',id);
+  if(error){ toast('Could not save: '+explain(error)); return; }
+  if(n.requires_bank_ack){ await sb.from('users').update({ bank_confirmed:true }).eq('id',me.id);
+    await audit('user.bank_confirm','user',me.id,`${me.name} ${me.surname} confirmed their updated banking details`);
+  } else { await audit('user.ack','user',me.id,`${me.name} ${me.surname} acknowledged an account update`); }
+  await loadNotifications(); renderNotifList();
+  if(!myNotifs.length) closeNotifications();
+  toast('Thanks — recorded.');
+}
+function openHRReview(id){ const u=hrAllUsers.find(x=>x.id===id); if(!u) return; hrEditingUser=u;
+  $('#hrSummary').innerHTML=`<b>${u.name} ${u.surname}</b> · ${u.employee_number||'—'}<br>${u.email} · Dept: ${u.department||'—'}<br>Line manager: ${u.manager_id?nameOf(u.manager_id):'—'}<br>Bank: ${u.bank_name||'—'} / code ${u.bank_code||'—'} / acc ${u.bank_account||'—'}`;
+  $('#hr-role').value='Employee';
+  $('#hr-centres').innerHTML=profitCentres.map(p=>`<label><input type="checkbox" class="hr-centre" value="${p}"> ${p}</label>`).join('');
+  toggleHRCentres(); $('#hrModal').classList.add('open'); }
+function closeHR(){ $('#hrModal').classList.remove('open'); hrEditingUser=null; }
+function toggleHRCentres(){ $('#hr-centres-wrap').style.display = $('#hr-role').value==='Manager'?'block':'none'; }
+async function approveUser(){ const u=hrEditingUser; if(!u) return;
+  const role=$('#hr-role').value;
+  const { error } = await sb.from('users').update({ status:'approved', role, approved_by_hr_id:me.id, approved_date:new Date().toISOString() }).eq('id',u.id);
+  if(error){ toast('Could not approve: '+explain(error)); return; }
+  if(role==='Manager'){ const centres=Array.from(document.querySelectorAll('.hr-centre:checked')).map(c=>c.value);
+    if(centres.length){ const rows=centres.map(p=>({profit_center:p, manager_id:u.id}));
+      const { error:ae } = await sb.from('approval_authority').upsert(rows,{onConflict:'profit_center,manager_id'});
+      if(ae) toast('Approved, but centre assignment failed: '+explain(ae)); } }
+  await audit('user.approve','user',u.id,`Approved account: ${u.name} ${u.surname} as ${role}`,{role, employee_number:u.employee_number});
+  toast(`${u.name} approved`); closeHR(); await refresh(); }
+async function rejectUser(){ const u=hrEditingUser; if(!u) return;
+  const reason=prompt('Reason for rejecting this registration:'); if(reason===null) return;
+  const { error } = await sb.from('users').update({ status:'rejected', rejection_remarks:reason, approved_by_hr_id:me.id, approved_date:new Date().toISOString() }).eq('id',u.id);
+  if(error){ toast('Could not reject: '+explain(error)); return; } await audit('user.reject','user',u.id,`Rejected registration: ${u.name} ${u.surname}`,{reason}); toast('Registration rejected'); closeHR(); await refresh(); }
+
+// ===== wire up =====
+$('#loginBtn').onclick=doLogin;
+$('#password').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+$('#logoutBtn').onclick=logout;
+$('#toRegister').onclick=showRegister;
+$('#toLogin').onclick=showLogin;
+$('#registerBtn').onclick=submitRegistration;
+$('#saveDraftBtn').onclick=saveDraft;
+$('#f-category').onchange=onCategoryChange;
+$('#f-km').oninput=recalcMileage;
+$('#f-date').addEventListener('change',()=>{ if($('#f-category').value==='mileage') recalcMileage(); });
+$('#saveEditBtn').onclick=saveEdit;
+$('#e-category').onchange=onEditCategoryChange;
+$('#e-km').oninput=recalcEditMileage;
+$('#e-date').addEventListener('change',()=>{ if($('#e-category').value==='mileage') recalcEditMileage(); });
+$('#submitApprovalBtn').onclick=()=>{ if(editingId) submitForApproval(editingId); };
+$('#closeEditBtn').onclick=closeEdit;
+$('#hr-role').onchange=toggleHRCentres;
+$('#hrApproveBtn').onclick=approveUser;
+$('#hrRejectBtn').onclick=rejectUser;
+$('#hrCloseBtn').onclick=closeHR;
+$('#rcInput').onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return;
+  if(uploadTxn==='form') setFormReceipt(f); else if(uploadTxn) uploadReceipt(f, uploadTxn); };
+$('#recConfirmBtn').onclick=doReconcile;
+$('#recCloseBtn').onclick=closeReconcile;
+$('#expGoBtn').onclick=runExport;
+$('#expCloseBtn').onclick=closeExport;
+$('#he-role').onchange=toggleHECentres;
+$('#heSaveBtn').onclick=saveHREdit;
+$('#heCloseBtn').onclick=closeHREdit;
+$('#notifCloseBtn').onclick=closeNotifications;
+if($('#pcDrillCloseBtn')) $('#pcDrillCloseBtn').onclick=closePcDrill;
+$('#rateAddBtn').onclick=addRate;
+$('#erSaveBtn').onclick=saveRateEdit;
+$('#erCloseBtn').onclick=closeRateEdit;
+$('#pcAddBtn').onclick=addCentre;
+$('#epcSaveBtn').onclick=savePcEdit;
+$('#epcCloseBtn').onclick=closePcEdit;
+$('#cfgThresholdBtn').onclick=saveThreshold;
+if($('#cfgDupFloorBtn')) $('#cfgDupFloorBtn').onclick=saveDupFloor;
+if($('#cfgCompanyBtn')) $('#cfgCompanyBtn').onclick=saveCompany;
+if($('#pcRequestBtn')) $('#pcRequestBtn').onclick=requestAdvance;
+if($('#pcSpendBtn')) $('#pcSpendBtn').onclick=captureFloatExpense;
+$('#genBatchesBtn').onclick=generateBatches;
+if($('#repPreviewBtn')){
+  $('#repPreviewBtn').onclick=reportPreview;
+  $('#repXlsxBtn').onclick=()=>reportExport('xlsx');
+  $('#repCsvBtn').onclick=()=>reportExport('csv');
+  ['rep-from','rep-to','rep-status','rep-pc'].forEach(id=>{ const el=$('#'+id); if(el) el.onchange=()=>{ window._repRows=null; }; });
+}
+// New-claim form: choose link + drag-and-drop
+$('#f-choose').onclick=()=>{ uploadTxn='form'; $('#rcInput').value=''; $('#rcInput').click(); };
+(function(){ const z=$('#f-drop'); if(!z) return;
+  z.addEventListener('dragover',e=>{ e.preventDefault(); z.classList.add('drag'); });
+  z.addEventListener('dragleave',()=>z.classList.remove('drag'));
+  z.addEventListener('drop',e=>{ e.preventDefault(); z.classList.remove('drag'); if(e.dataTransfer.files&&e.dataTransfer.files[0]) setFormReceipt(e.dataTransfer.files[0]); });
+})();
+
+(async function(){
+  try{ if(sessionStorage.getItem('claimflow_idle')){ sessionStorage.removeItem('claimflow_idle'); const e=$('#loginErr'); if(e){ e.className='err show'; e.textContent='You were signed out after 5 minutes of inactivity. Please sign in again.'; } } }catch(e){}
+  try{ localStorage.removeItem('claimflow_user'); }catch(e){}
+  loadCompanyInfo();
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session && session.user){
+    const data = await loadProfile(session.user.id);
+    if(data && (data.status||'').toLowerCase()==='approved'){ me=data; startApp(); }
+    else { try{ await sb.auth.signOut(); }catch(e){} }
+  }
+})();
+</script>
+</body>
+</html>
